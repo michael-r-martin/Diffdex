@@ -1,0 +1,19 @@
+{
+  "name": "codex-inline-diff-prototype",
+  "displayName": "Codex Inline Diff Prototype",
+  "description": "Experiments with deleted text inside a normal VS Code editor.",
+  "version": "0.0.1",
+  "publisher": "unserious-labs",
+  "engines": { "vscode": "^1.85.0" },
+  "main": "./src/extension.js",
+  "activationEvents": ["onStartupFinished"],
+  "scripts": { "test": "node --test", "check": "node --check src/extension.js && node --check src/diff.js && node --check prototype/runtime-overlay.js && node --check prototype/patch-copy.cjs && sh -n prototype/launch-copy.sh" },
+  "contributes": {
+    "commands": [
+      { "command": "codexDiff.demo", "title": "Codex Diff: Open Rendering Demo" },
+      { "command": "codexDiff.capture", "title": "Codex Diff: Snapshot Current File" },
+      { "command": "codexDiff.toggle", "title": "Codex Diff: Toggle Multiline Attachment Experiment" },
+      { "command": "codexDiff.clear", "title": "Codex Diff: Clear Snapshots" }
+    ]
+  }
+}

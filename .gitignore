@@ -1,0 +1,6 @@
+.prototype-runtime/
+.DS_Store
+node_modules/
+coverage/
+*.vsix
+*.log
