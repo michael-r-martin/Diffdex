@@ -1,19 +1,58 @@
 {
   "name": "codex-inline-diff-prototype",
-  "displayName": "Codex Inline Diff Prototype",
-  "description": "Experiments with deleted text inside a normal VS Code editor.",
-  "version": "0.0.1",
+  "displayName": "Codex Chat Diffs",
+  "description": "Per-chat Codex hook snapshots rendered inside a patched VS Code editor.",
+  "version": "0.1.0",
   "publisher": "unserious-labs",
-  "engines": { "vscode": "^1.85.0" },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
   "main": "./src/extension.js",
-  "activationEvents": ["onStartupFinished"],
-  "scripts": { "test": "node --test", "check": "node --check src/extension.js && node --check src/diff.js && node --check prototype/runtime-overlay.js && node --check prototype/patch-copy.cjs && sh -n prototype/launch-copy.sh" },
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check src/extension.js && node --check src/diff.js && node --check prototype/runtime-overlay.js && node --check prototype/patch-copy.cjs && sh -n prototype/launch-copy.sh && node --check hooks/capture.cjs && node --check scripts/install-hooks.cjs && node --check src/store.js && node --check src/review.js && node --check prototype/review-undo.js && node --check src/merge.js"
+  },
   "contributes": {
     "commands": [
-      { "command": "codexDiff.demo", "title": "Codex Diff: Open Rendering Demo" },
-      { "command": "codexDiff.capture", "title": "Codex Diff: Snapshot Current File" },
-      { "command": "codexDiff.toggle", "title": "Codex Diff: Toggle Multiline Attachment Experiment" },
-      { "command": "codexDiff.clear", "title": "Codex Diff: Clear Snapshots" }
-    ]
+      {
+        "command": "codexDiff.selectChat",
+        "title": "Codex Diffs: Select Chat"
+      },
+      {
+        "command": "codexDiff.refresh",
+        "title": "Codex Diffs: Refresh"
+      },
+      {
+        "command": "codexDiff.openFile",
+        "title": "Codex Diffs: Open Changed File"
+      },
+      {
+        "command": "codexDiff.resolveIncoming",
+        "title": "Codex Diffs: Resolve Incoming Changes"
+      }
+    ],
+    "viewsContainers": {"activitybar":[{"id":"codexDiff","title":"Codex Diffs","icon":"media/diffs.svg"}]},
+    "views": {
+      "codexDiff": [{"id":"codexDiff.review","name":"Review Changes","type":"webview"}],
+      "explorer": [
+        {
+          "id": "codexDiff.files",
+          "name": "Codex Chat Changes"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Codex Diffs",
+      "properties": {
+        "codexDiff.storePath": {
+          "type": "string",
+          "default": "",
+          "description": "Local snapshot directory shared with the Codex capture hooks. Empty uses this prototype\u2019s runtime directory."
+        }
+      }
+    }
   }
 }

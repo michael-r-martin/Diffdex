@@ -4,13 +4,13 @@ The locally copied VS Code 1.142.0 bundle is patched in `.prototype-runtime/Code
 
 The copied application has an ad-hoc local development signature. `codesign --verify --deep --strict` passed. Gatekeeper has not been disabled. The initial unsigned copy was rejected by macOS and removed before recreation.
 
-Launch with `sh prototype/launch-copy.sh`. This creates a fresh temporary profile, isolates shared storage and extensions, and opens `demo/view-zone-demo.js` at line 4. Updates are disabled in the temporary profile. An initial launch before shared-storage isolation opened the existing shared-storage database; subsequent launches explicitly isolate it.
+Launch with `sh prototype/launch-copy.sh`. This creates a fresh temporary profile, isolates shared storage and extensions, loads the companion extension, and opens the project. Updates are disabled in the temporary profile. An initial early prototype launch before shared-storage isolation opened the existing shared-storage database; subsequent launches explicitly isolate it.
 
-In the demo editor, three red rows appear automatically above the known replacement statement, and that source line turns green. There is no toggle or cursor dependency. Inserting lines above the statement moves the overlay with it. If the statement disappears or becomes ambiguous, the overlay clears. Deleted text is a view-zone DOM node, never document content.
+Deleted rows now come from the selected chat's captured snapshots. The extension calls the private `_codexDiff.setChanges` command; the patched editor displays matching hunks automatically, without a toggle or cursor dependency. See [hook setup](../hooks/README.md). No demo rows are injected.
 
 VS Code may report that the installation appears corrupt: its own integrity checks detect the deliberately modified bundle, independently of macOS signing. Those checks remain enabled. The warning concerns this disposable copy.
 
-This is a hard-coded visual spike, not a live diff implementation. No Codex hooks are configured. The main bundle passes JavaScript syntax checking and the signed application starts, and the user confirmed automatic in-file rendering works on 19 October 2026. Automated visual inspection was unavailable. Inspect the developer console for `[Codex Diff Lab]` messages when debugging.
+The initial in-file renderer was visually confirmed by the user on 19 October 2026. The live snapshot bridge subsequently passed an automated test inside the actual patched editor with synthetic hook events. Mac-app hook firing still requires a chat that has loaded the trusted configuration.
 
 The bundle hook is pinned by SHA-256 in `patch-copy.cjs`; it deliberately refuses other versions. Every bundle modification requires re-signing the disposable copy before launch.
 

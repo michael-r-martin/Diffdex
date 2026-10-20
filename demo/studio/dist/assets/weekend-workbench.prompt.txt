@@ -1,0 +1,11 @@
+Generated with the built-in image_gen tool.
+
+Use case: stylized-concept
+Asset type: home page hero illustration for Weekend Studio, a friendly side-project idea board.
+Primary request: a beautifully art-directed miniature creative workbench, celebrating making something small on a weekend.
+Subject: an open sketchbook with simple abstract shapes, a lavender pencil, a tiny laptop with an abstract lime green window (no letters), paper offcuts, and a peach ceramic coffee cup, composed as one compact still life.
+Style/medium: tactile cut-paper collage meets softly sculpted clay, editorial design magazine illustration, crisp silhouettes, subtle paper grain, gentle dimensional shadows, sophisticated and playful.
+Composition/framing: landscape 3:2 image, slightly elevated three-quarter view, central balanced arrangement, generous breathing room on all edges. Warm ivory seamless backdrop #f5f2eb, no horizon line.
+Color palette: warm ivory, lavender #d9cefa, lime #e0ed9d, peach #f6d4bd, deep plum #302443 details.
+Lighting/mood: soft natural afternoon light from upper left, calm, optimistic, handmade.
+Constraints: no text, letters, typography, logos, watermark, people, borders or UI mockup. A polished standalone artwork, not a screenshot.

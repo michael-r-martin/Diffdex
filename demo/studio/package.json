@@ -1,0 +1,9 @@
+{
+  "name": "weekend-studio-demo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node server.cjs",
+    "check": "node --check server.cjs && node --check dist/app.js && node --check dist/theme.js"
+  }
+}
