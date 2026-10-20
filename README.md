@@ -1,72 +1,136 @@
-# Codex in-editor chat diffs
+# Diffdex
 
-Captures Codex `apply_patch` edits per chat and displays additions and deleted-code rows directly inside normal file editors in a disposable patched VS Code build.
+**Cursor-like inline diffs. A native IDE experience. The native Codex harness.**
 
-## Run locally
+Diffdex brings inline code review to your Codex workflow in a standalone macOS editor. Use Codex in the terminal, the Codex Mac app, or the embedded IDE extension, then inspect and accept or reject its changes directly in your files.
+
+## Why Diffdex?
+
+- **Review changes where you write code.** See added and deleted lines inside the editor, with surrounding code for context. Accept or reject individual blocks, entire files, or a chat's changes.
+- **Use Codex your way.** Keep the native Codex harness and work from its terminal UI, Mac app, or IDE extension. Diffdex captures local changes through Codex hooks and adds the review interface.
+- **Follow the conversation automatically inside the IDE.** Switch chats in the embedded Codex extension and the review sidebar and file navigator follow the selected chat. Terminal and Mac-app sessions can be selected from Diffdex's chat picker.
+- **Find unfinished reviews across chats.** The top strip shows when other chats have pending changes. Pick one to jump straight to its first changed file.
+- **Stay in a full IDE.** Browse your project, edit files, use the integrated terminal, and review AI changes in one VS Code-based application.
+- **Change your mind with undo.** Accept and reject decisions support normal undo/redo. Rejected changes stay in an unsaved buffer so you can inspect them before saving.
+
+Diffdex is experimental and currently supports Apple Silicon Macs. You build the app locally using the setup commands below.
+
+## Works with your Codex workflow
+
+Diffdex reviews changes made in the **same local checkout** by any of these Codex clients, provided they load and run the project's trusted capture hooks:
+
+| Codex client | Where you work | How to select its changes in Diffdex |
+| --- | --- | --- |
+| Terminal UI (TUI) | Run `codex` from the project in your terminal, including Diffdex's integrated terminal. | Choose the captured session in the chat picker or **Other chats** dropdown. |
+| Codex Mac app | Run a local task against the checkout open in Diffdex. | Choose the captured session in the chat picker or **Other chats** dropdown. |
+| Embedded IDE extension | Chat with Codex inside Diffdex. | Review selection follows the focused Codex chat automatically; manual selection is also available. |
+
+Diffdex does not follow chat selection in a separate terminal or the Mac app. You can still review their captured edits, accept/reject changes, and navigate between sessions.
+
+If the Mac app uses a separate worktree, open that worktree in Diffdex and enable capture there. Remote/cloud tasks are outside this local capture workflow. The terminal UI and Mac app are installed separately; Diffdex's setup bundles the IDE extension.
+
+## Requirements
+
+- An Apple Silicon Mac (M1 or newer), with the checkout on an APFS volume.
+- Git, Node.js 22 or newer, and npm.
+- Several GB of free disk space for the editor, extensions and built app.
+- Internet access to download the required editor and extensions.
+- Your own Codex account/access.
+
+Setup obtains the supported versions of VS Code and the Codex extensions automatically, or reuses matching local copies. You do not need to install npm dependencies or configure an API key for Diffdex's review features.
+
+## Install
+
+Clone the repository and prepare the editor and Codex extensions:
 
 ```sh
-sh prototype/launch-copy.sh
+git clone https://github.com/michael-r-martin/cursordiffs.git diffdex
+cd diffdex
+npm run setup:mac
+npm run setup:codex
 ```
 
-The launcher opens this project in the patched copy and loads the companion extension. Its profile, shared storage, and extensions directory are isolated from normal VS Code. See [copy setup/signing](prototype/DISPOSABLE-COPY.md) if the disposable app has not been prepared.
+Setup prepares isolated copies inside the checkout. It leaves your existing VS Code and extension installations intact.
 
-Install the capture hooks for a project:
+Build the app:
 
 ```sh
-node scripts/install-hooks.cjs /absolute/path/to/project
+npm run package:mac -- dist/my-first-build
 ```
 
-Review/trust the hooks through Codex's `/hooks` CLI flow. This project's two capture hooks have already been approved. Newly installed hooks may require reloading the desktop chat's configuration or starting a fresh chat. [Hook details and limitations](hooks/README.md).
+The build runs automated checks and creates `dist/my-first-build/Diffdex.app`.
 
-Open the same checkout in the patched editor and make an edit through Codex. The **Codex Chat Changes** Explorer section lists captured files. Click the **Codex** status-bar item or run **Codex Diffs: Select Chat** to choose a session. Diffs appear automatically in matching files; no toggle or cursor placement is needed. Chat IDs are shown because hook payloads do not include chat titles.
+1. Open `dist/my-first-build` in Finder.
+2. Drag `Diffdex.app` into `/Applications`.
+3. Launch Diffdex and open your project with **File → Open Folder**.
+4. Use the embedded Codex extension, or keep working in your Codex terminal UI or Mac app.
 
-Each block has **Accept** and **Reject** buttons. Accept clears its review overlay without editing the file. Normal Undo restores the accepted block and Redo accepts it again; later typing remains a separate undo step. Reject restores its original lines in the editor and preserves independent code outside the block; normal Undo reverses it. Reject leaves the document unsaved. Review decisions persist locally for the current captured snapshot; a later Codex capture of that file starts a new review.
+If you are replacing an existing Diffdex installation, quit it first. Use a new build output directory each time.
 
-When Codex edits a file with unsaved editor changes, non-overlapping changes merge into the buffer automatically as an undoable edit. Conflicting changes stay pending: a notification and the status bar offer **Load Codex version** or **Keep editor version**. Loading is undoable; neither choice automatically saves your file. You can reopen this choice with **Codex Diffs: Resolve Incoming Changes**.
+The app is signed for local use but is not notarized by Apple. If macOS blocks it, check the build's verification output and the [signing guidance](docs/releasing.md#8-signing-and-download-delivery).
 
-## Architecture
+## Review your first changes
 
-See the [system flowchart and implementation guide](docs/architecture.md).
+Enable change capture once for each project:
 
-1. `hooks/capture.cjs` stores the first contents and latest result for each checkout/chat/file. It runs independently of VS Code.
-2. `src/extension.js` reads snapshots, computes hunks, provides chat selection and changed-file navigation, and sends the selected chat to a private editor command.
-3. `prototype/runtime-overlay.js` renders deleted text as real editor view zones and additions as decorations. It never inserts old code into the document.
+1. Open the command palette (`⇧⌘P`) and run **Diffdex: Enable Change Capture for Project**.
+2. Review the generated `.codex/hooks.json`. Existing unrelated hooks are preserved.
+3. Run `codex` in that checkout and use `/hooks` to review and trust the two capture handlers. If necessary, reload the client/session you will use or start a fresh chat so it loads the configuration.
+4. Ask Codex to make a small edit from your chosen client. Open the file in Diffdex to review it, and select the captured session in **Review Changes**.
 
-Snapshot storage and app binaries live under ignored `.prototype-runtime/`. Generated project hook configuration is also ignored. Hooks use only local files; no API credentials or network service are needed.
+When using the embedded extension, switching Codex chats automatically updates the review selection. For terminal and Mac-app sessions, choose the chat manually or use **Other chats** in the top strip to jump to its pending changes.
 
-## Verification
+**Accept** clears a review overlay while keeping the code. **Reject** restores the previous code in the editor and leaves the file unsaved. Normal undo restores review decisions.
+
+Only edits made after capture is enabled are available for review. See [capture scope and limitations](hooks/README.md) for supported files, concurrent edits and scan limits.
+
+## Updating and storage
+
+To update, pull a tested revision, run the setup commands again, and build into a fresh output directory. Quit Diffdex before replacing the app in `/Applications`. Automatic editor updates are disabled to keep the review integration compatible.
+
+Settings and review captures are stored locally under `~/Library/Application Support/Diffdex/`, separately from the application. Replacing the app preserves this data. Codex may also use your existing local account and session data.
+
+Once installed, Diffdex's capture hooks use its bundled runtime. Keep the repository checkout if you want to rebuild the app.
+
+To open a project from the terminal:
+
+```sh
+/Applications/Diffdex.app/Contents/Resources/app/bin/diffdex /absolute/path/to/project
+```
+
+Before uninstalling, remove Diffdex's capture handlers from each project's `.codex/hooks.json`. Removing the app does not automatically delete settings or review captures.
+
+## Troubleshooting
+
+| Problem | Next step |
+| --- | --- |
+| Editor or extension setup fails | Check your internet connection and rerun the setup command. Setup requires specific supported versions; do not substitute newer versions manually. |
+| Editor download hash mismatch | Stop and report the error rather than bypassing verification. |
+| Output directory already exists | Choose a fresh directory, such as `dist/my-next-build`. |
+| No changes appear | Enable capture for the project, trust the hooks, reload the chat and make a new edit. |
+| Review selection stops following Codex | Rerun `npm run setup:codex` and rebuild. Use the manual chat picker while diagnosing. |
+| Incoming changes conflict with unsaved work | Use the offered conflict-resolution controls to choose which changes to keep. |
+
+For custom editor/extension locations and exact supported versions, see the [packager reference](packaging/README.md) and [dependency pins](docs/releasing.md#3-dependency-pins-and-reproducible-setup).
+
+## Roadmap
+
+- [ ] **Follow the latest edits across Codex clients.** Add an optional mode that selects the chat that most recently changed a file, including TUI and Mac-app sessions. Pause automatic following when you manually select a chat so background tasks do not interrupt your review.
+- [ ] **Explore following the active TUI or Mac-app chat.** Investigate client signals for switching review context when you switch conversations, even before an edit occurs.
+- [ ] **Ship a fully distributable app.** Move to a source-built Code - OSS foundation, resolve third-party extension and integration permissions, and provide signed, notarized macOS downloads with a tested update path—so installation no longer requires a local build.
+
+These are planned directions, not released features. See the [release guide](docs/releasing.md) for the distribution work in more detail.
+
+## Development
 
 ```sh
 npm test
 npm run check
 ```
 
-Twenty-seven tests cover accumulation, separate chats, creation/deletion/rename, path boundaries, missing pre-events, config merging, diff grouping, and renderer behavior. An actual desktop extension-host test in `scripts/vscode-e2e.cjs` also passed with synthetic hook payloads: capture subprocess → store → extension → real editor view zone, plus source-content preservation, preservation after unrelated unsaved edits, built-in theme and grammar registration, source/deleted-code tokenization, and switching to a light theme. Live Mac-app hook capture has also been verified separately.
+- [Architecture](docs/architecture.md)
+- [Capture hooks](hooks/README.md)
+- [Packaging](packaging/README.md)
+- [Release guide and third-party licensing considerations](docs/releasing.md)
 
-## Current limits
-
-- `apply_patch` only; shell edits are not captured yet.
-- Only new edits are captured, not earlier chat history.
-- Files must be UTF-8 text, at most 1 MiB, inside the hook working directory. The diff algorithm has a 2,000,000 line-pair limit.
-- Captured blocks track live edits within their boundaries. Enter at the first column of a block creates an independent line above it; Enter at the final column creates one below it; typing outside a block only moves its anchor. Restoring the block’s original text clears its diff.
-- Fully deleted files are listed, but cannot have overlays in a nonexistent file editor.
-- Overlapping edits to one file are not transactionally attributed.
-- This remains a hash-pinned patch for VS Code 1.142.0. The modified copy displays VS Code's integrity warning; checks remain enabled.
-
-`prototype/codexDeletedLines.ts` is an earlier uncompiled source-build draft, not the current renderer. The earlier demo file is retained as a fixture but no longer has hard-coded overlays.
-# Sidebar review
-
-Inline editors show pending blocks from all captured chats in the open checkout. The sidebar and top **← / →** navigator are scoped to the selected chat. The navigator counts only that chat's unique files with displayable pending blocks. Accepted or rejected blocks leave that list; undo brings them back.
-
-Separate changes in the same file can appear together. Older snapshots that overlap newer edits are flagged in their chat's sidebar instead of being rendered over unrelated code. Whole-file deletions and unresolved conflicts are excluded from the inline navigator.
-
-The top navigator also provides **Accept File** and **Reject File** for the selected chat's pending blocks in that file. These controls are disabled when that chat has no changes in the file. Rejection leaves the buffer unsaved; undo restores decisions block by block.
-
-The disposable Codex IDE extension has a private selection adapter installed by `node scripts/install-codex-selection-bridge.cjs`. It follows the focused Codex view's chat selection, including new chats without captures. **Choose chat** is a manual override until Codex reports another selection/focus event. This adapter is pinned to Codex extension 26.1007.21434; it is not a public API and may need updating after an extension upgrade. Original modified files are backed up under `.prototype-runtime/codex-selection-backup`. The adapter reads only the selected chat ID, not message content.
-
-Click the **Codex Diffs** icon (a page with plus/minus signs) in the Activity Bar to open **Review Changes**. Choose a chat to see its pending blocks across files as unified removed/added rows with surrounding context.
-
-- **Accept / Reject** applies to one block; **Open file** takes you to its source.
-- **Accept all / Reject all** processes the pending blocks for the selected chat. Decisions share state with the inline editor controls.
-- Rejections edit buffers without saving them. Undo/redo remains per file; a bulk operation creates individual decisions in each file's undo history.
-- Stale clicks are refused. Bulk actions process reviewable blocks and explicitly skip files flagged with incoming conflicts, unavailable contents, oversized diffs, or whole-file deletions. Whole-file deletion restoration is not implemented yet.
+The build scripts produce a local installation. See the release guide before redistributing a built app or third-party components.

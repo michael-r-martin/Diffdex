@@ -1,6 +1,8 @@
 const { projectReview } = require('./project-review');
 const { planRejection, advanceReview } = require('./review-actions');
 const { chatPickerItems } = require('./chat-picker');
+const { chatNavigationItems } = require('./chat-navigation');
+const { captureCommand, installProjectHooks } = require('./setup');
 const vscode = require('vscode');
 const path = require('node:path');
 const fs = require('node:fs');
@@ -12,6 +14,10 @@ const { ReviewSidebar } = require('./sidebar');
 const { reconcileReview, reconcileLatestReview, combineDocuments } = require('./combined');
 const { createTitleReader } = require('./chat-titles');
 function activate(context) {
+  const packaged = fs.existsSync(path.join(context.extensionPath, 'diffdex.json'));
+  const captureStore = () => vscode.workspace.getConfiguration('codexDiff').get('storePath') || (packaged
+    ? path.join(context.globalStorageUri.fsPath, 'captures')
+    : path.join(context.extensionPath, '.prototype-runtime/captures'));
   const readTitles=createTitleReader();
   const log = vscode.window.createOutputChannel('Codex Diffs');
   const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
@@ -32,6 +38,7 @@ function activate(context) {
   let changedFiles=[];
   let inlineDocuments=[];
   let navigationDocuments=[];
+  let navigationChats=[];
   let followedChatId;
   const sidebar=new ReviewSidebar(context, async message=>{
     if(message?.type==='resolve') return vscode.commands.executeCommand('codexDiff.resolveFile',message);
@@ -69,6 +76,9 @@ function activate(context) {
       const session = sessions.find(s => s.key === selected);
       return (session?.files || []).map(file => {
         const item = new vscode.TreeItem(path.relative(session.cwd, file.path));
+        item.resourceUri = vscode.Uri.file(file.path);
+        item.iconPath = vscode.ThemeIcon.File;
+        item.tooltip = file.path;
         item.description = !file.after.exists ? 'deleted' : !file.before.exists ? 'added' : 'modified';
         item.command = { command: 'codexDiff.openFile', title: 'Open changed file', arguments: [file] };
         return item;
@@ -80,9 +90,9 @@ function activate(context) {
     if (busy) { pending = true; return; }
     busy = true;
     try {
-      const store = vscode.workspace.getConfiguration('codexDiff').get('storePath') || path.join(context.extensionPath, '.prototype-runtime/captures');
+      const store = captureStore();
       const roots = (vscode.workspace.workspaceFolders || []).map(f => { try { return fs.realpathSync(f.uri.fsPath); } catch { return f.uri.fsPath; } });
-      sessions = listSessions(store, roots);
+      sessions = packaged && !roots.length ? [] : listSessions(store, roots);
       const titles=readTitles();
       sessions=sessions.map(s=>({...s,title:titles.get(s.sessionId)||'Untitled chat'}));
       if(followedChatId!==undefined)selected=sessions.find(s=>s.sessionId===followedChatId)?.key;
@@ -152,8 +162,10 @@ function activate(context) {
       const editorDocuments=combineDocuments(projected);
       inlineDocuments=editorDocuments;
       navigationDocuments=combineDocuments(documents.map(d=>projectReview(d,d.current)).filter(Boolean));
-      changedFiles=[...new Set(documents.filter(d=>!d.warning&&d.hunks.length).map(d=>d.uri))];
-      const payload = { documents:editorDocuments, changedFiles, navigationDocuments };
+      navigationChats=chatNavigationItems(sessions,projected);
+      changedFiles=navigationChats.find(chat=>chat.key===selected)?.files||[];
+      const otherChats=navigationChats.filter(chat=>chat.key!==selected);
+      const payload = { documents:editorDocuments, changedFiles, navigationDocuments, otherChats };
       // Content events update the diff immediately; polling discovers hook captures.
       const results = await vscode.commands.executeCommand('_codexDiff.setChanges', payload);
       if (process.env.CODEX_DIFF_DIAGNOSTICS) fs.writeFileSync(path.join(context.extensionPath, '.prototype-runtime/render-status.json'), JSON.stringify({ languages: await vscode.languages.getLanguages(), extensions: vscode.extensions.all.map(e => e.id), theme: vscode.workspace.getConfiguration('workbench').get('colorTheme'), results }, null, 2));
@@ -177,6 +189,18 @@ function activate(context) {
     }
   }
   context.subscriptions.push(log, status, treeChanged,
+    vscode.commands.registerCommand('codexDiff.enableCapture', async () => {
+      const folders = vscode.workspace.workspaceFolders || [];
+      if (!folders.length) { vscode.window.showInformationMessage('Open a project folder, then run Diffdex: Enable Change Capture for Project.'); return; }
+      const folder = folders.length === 1 ? folders[0] : await vscode.window.showWorkspaceFolderPick({ placeHolder: 'Choose the project to capture' });
+      if (!folder) return;
+      try {
+        const executable = packaged ? path.resolve(vscode.env.appRoot, '../../MacOS/Diffdex') : process.execPath;
+        const file = installProjectHooks(folder.uri.fsPath, captureCommand(context.extensionPath, captureStore(), executable));
+        const action = await vscode.window.showInformationMessage('Capture hooks installed. Review and trust them in Codex before use; you may need to start a new chat.', 'View hooks');
+        if (action) await vscode.window.showTextDocument(vscode.Uri.file(file));
+      } catch (error) { vscode.window.showErrorMessage(`Diffdex could not set up capture: ${error.message}`); }
+    }),
     vscode.commands.registerCommand('codexDiff.followChat',async request=>{
       if(request?.id!==null&&(typeof request?.id!=='string'||!request.id.length||request.id.length>200))return false;
       followedChatId=request.id;
@@ -215,6 +239,22 @@ function activate(context) {
       const index=changedFiles.indexOf(current),direction=request?.direction===-1?-1:1;
       const next=index<0?0:(index+direction+changedFiles.length)%changedFiles.length;
       await vscode.window.showTextDocument(vscode.Uri.parse(changedFiles[next]),{preview:false});
+    }),
+    vscode.commands.registerCommand('codexDiff.jumpToChat',async request=>{
+      if(typeof request?.key!=='string')return false;
+      await refresh();
+      if(!navigationChats.some(chat=>chat.key===request.key)){
+        vscode.window.showInformationMessage('That chat no longer has changes ready to review.');
+        return false;
+      }
+      followedChatId=undefined;
+      selected=request.key;
+      await context.workspaceState.update('selectedChat',selected);
+      await refresh();
+      const first=navigationChats.find(chat=>chat.key===selected)?.files[0];
+      if(!first)return false;
+      await vscode.window.showTextDocument(vscode.Uri.parse(first),{preview:false});
+      return true;
     }),
     vscode.window.registerWebviewViewProvider('codexDiff.review',sidebar),
     vscode.commands.registerCommand('codexDiff.sidebarState',()=>sidebar.state),

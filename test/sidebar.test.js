@@ -12,6 +12,7 @@ test('bulk buttons submit eligible files despite warnings and unlock on completi
   const file={name:'a.js',reviewKey:'chat:a',reviewVersion:'v1',after:'new',hunks:[{start:0,block:0,removed:['old'],added:['new']}]};
   const state={selection:'chat',chat:'chat',files:[file,{name:'unavailable.js',warning:'Unavailable',hunks:[]}]};
   receive({data:state});
+  assert.match(ids.summary.textContent,/1 block in 1 file ready to review/);
   for(const action of ['accept','reject']){
     assert.equal(ids[action].disabled,false);
     ids[action].onclick();
@@ -31,4 +32,7 @@ test('bulk buttons submit eligible files despite warnings and unlock on completi
   assert.ok(keep);assert.equal(keep.disabled,false);keep.onclick();
   assert.equal(sent.at(-1).type,'resolve');assert.equal(sent.at(-1).action,'resolve');
   assert.equal(sent.at(-1).reviewKey,'chat:old');
+  receive({data:{...state,done:true,files:[]}});
+  assert.ok(nodes.some(n=>n.textContent?.includes('You’re all caught up.')));
+  assert.equal(ids.accept.disabled,true);
 });

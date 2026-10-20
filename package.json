@@ -1,6 +1,6 @@
 {
   "name": "codex-inline-diff-prototype",
-  "displayName": "Codex Chat Diffs",
+  "displayName": "Diffdex Reviews",
   "description": "Per-chat Codex hook snapshots rendered inside a patched VS Code editor.",
   "version": "0.1.0",
   "publisher": "unserious-labs",
@@ -12,11 +12,20 @@
     "onStartupFinished"
   ],
   "scripts": {
-    "test": "node --test",
-    "check": "node --check src/extension.js && node --check src/diff.js && node --check prototype/runtime-overlay.js && node --check prototype/patch-copy.cjs && sh -n prototype/launch-copy.sh && node --check hooks/capture.cjs && node --check scripts/install-hooks.cjs && node --check src/store.js && node --check src/review.js && node --check prototype/review-undo.js && node --check src/merge.js"
+    "setup:mac": "node packaging/editor-source.cjs",
+    "setup:codex": "node packaging/setup-codex.cjs",
+    "package:mac": "node packaging/package-macos.cjs",
+    "build:mac": "node packaging/build-macos.cjs",
+    "verify:mac": "node packaging/verify-macos.cjs",
+    "test": "node --test test/*.test.js",
+    "check": "node --check src/extension.js && node --check src/diff.js && node --check prototype/runtime-overlay.js && node --check prototype/patch-copy.cjs && sh -n prototype/launch-copy.sh && node --check hooks/capture.cjs && node --check scripts/install-hooks.cjs && node --check src/store.js && node --check src/review.js && node --check prototype/review-undo.js && node --check src/merge.js && node --check packaging/editor-source.cjs && node --check packaging/setup-codex.cjs && node --check packaging/build-macos.cjs && node --check packaging/verify-macos.cjs && node --check packaging/package-macos.cjs"
   },
   "contributes": {
     "commands": [
+      {
+        "command": "codexDiff.enableCapture",
+        "title": "Diffdex: Enable Change Capture for Project"
+      },
       {
         "command": "codexDiff.selectChat",
         "title": "Codex Diffs: Select Chat"
@@ -34,9 +43,23 @@
         "title": "Codex Diffs: Resolve Incoming Changes"
       }
     ],
-    "viewsContainers": {"activitybar":[{"id":"codexDiff","title":"Codex Diffs","icon":"media/diffs.svg"}]},
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "codexDiff",
+          "title": "Codex Diffs",
+          "icon": "media/diffs.svg"
+        }
+      ]
+    },
     "views": {
-      "codexDiff": [{"id":"codexDiff.review","name":"Review Changes","type":"webview"}],
+      "codexDiff": [
+        {
+          "id": "codexDiff.review",
+          "name": "Review Changes",
+          "type": "webview"
+        }
+      ],
       "explorer": [
         {
           "id": "codexDiff.files",

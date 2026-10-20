@@ -16,6 +16,8 @@ printf '%s\n' "$LAB_PROFILE" > "$LAB_ROOT/.prototype-runtime/last-profile.txt"
 if [ ! -d "$LAB_PROFILE/builtin-extensions" ]; then
   cp -cR "$LAB_ROOT/.prototype-runtime/Codex Diff Lab.app/Contents/Resources/app/extensions" "$LAB_PROFILE/builtin-extensions"
 fi
+# Repair both new and reused profiles without changing resource permissions.
+node "$LAB_ROOT/prototype/prepare-icon-theme.cjs" "$LAB_PROFILE" "$LAB_ROOT/.prototype-runtime/Codex Diff Lab.app"
 # LaunchServices owns the GUI process, not the invoking Terminal session.
 # A separate launch keeps our profile isolated from normal VS Code; Electron
 # forwards repeated launches to the instance already using this profile.
