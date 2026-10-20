@@ -134,3 +134,7 @@ npm run check
 - [Release guide and third-party licensing considerations](docs/releasing.md)
 
 The build scripts produce a local installation. See the release guide before redistributing a built app or third-party components.
+
+## License
+
+Diffdex's original code and documentation are available under the [MIT License](LICENSE), copyright 2026 Michael Martin. Third-party code, applications and extensions retain their own licenses and terms; this license does not grant additional rights to VS Code or Codex.

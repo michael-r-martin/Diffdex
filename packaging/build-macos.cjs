@@ -91,6 +91,7 @@ function build(output = path.join(root, 'dist', `build-${Date.now()}`)) {
   fs.writeFileSync(path.join(appRoot, relativeWorkbench), patched);
   const extension = path.join(appRoot, 'extensions/diffdex-reviews');
   fs.mkdirSync(extension);
+  fs.copyFileSync(path.join(root, 'LICENSE'), path.join(extension, 'LICENSE'));
   for (const directory of ['src', 'media', 'hooks']) fs.cpSync(path.join(root, directory), path.join(extension, directory), { recursive: true });
   fs.mkdirSync(path.join(extension, 'scripts'));
   fs.copyFileSync(path.join(root, 'scripts/install-hooks.cjs'), path.join(extension, 'scripts/install-hooks.cjs'));

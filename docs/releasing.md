@@ -24,7 +24,7 @@ Exclude app bundles, VSIX archives, extracted vendor extensions, profiles, authe
 Before making the repository public:
 
 - Review `git ls-files`, the proposed commit diff and the complete history for private state and third-party assets. Secret scanning should include history, not just the working directory. Rotate any exposed credentials rather than merely deleting them.
-- Choose a license for code we own and add the corresponding LICENSE file; do not apply that license to third-party software by implication. Document branding ownership separately if needed.
+- Keep the root MIT LICENSE file with our original code and documentation. Third-party components retain their own licenses and terms; do not apply MIT to them by implication.
 - Ensure every required source/branding file is committed. A local build can succeed with untracked files that a clone will not receive.
 - Confirm that the README clone URL matches the final repository name and visibility. A rename is optional; GitHub currently calls this repository `cursordiffs`.
 - Mark the project experimental, state supported hardware and the exact input versions, and describe unavailable features honestly.

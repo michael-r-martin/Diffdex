@@ -21,7 +21,8 @@ function verify(app) {
     assert.equal(actual, expected, `Integrity: ${file}`);
   }
   const names = fs.readdirSync(extension).sort();
-  assert.deepEqual(names, ['diffdex.json', 'hooks', 'media', 'package.json', 'scripts', 'src']);
+  assert.deepEqual(names, ['LICENSE', 'diffdex.json', 'hooks', 'media', 'package.json', 'scripts', 'src']);
+  assert.equal(fs.readFileSync(path.join(extension, 'LICENSE'), 'utf8'), fs.readFileSync(path.join(__dirname, '../LICENSE'), 'utf8'));
   assert.ok(fs.statSync(path.join(app, 'Contents/Resources/Diffdex.icns')).size > 0);
   const version = execFileSync(path.join(base, 'bin/diffdex'), ['--version'], { encoding: 'utf8' });
   assert.match(version, /1\.142\.0/);
