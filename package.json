@@ -4,6 +4,7 @@
   "description": "Per-chat Codex hook snapshots rendered inside a patched VS Code editor.",
   "version": "0.1.0",
   "publisher": "unserious-labs",
+  "license": "MIT",
   "engines": {
     "vscode": "^1.85.0"
   },
