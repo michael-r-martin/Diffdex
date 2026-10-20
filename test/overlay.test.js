@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const fs = require('node:fs');
 test('renders real payload automatically, switches chats, and refuses stale contents', async () => {
-  const events = {}, zones = new Map(), elements = [], buttons = [], calls = [];
+  const events = {}, zones = new Map(), elements = [], buttons = [], calls = [], selects=[];
   let host = null, model = null, next = 0, text = 'new\n', version=1;
   const uri='file:///project/a.js';
   const fixture = { uri:{scheme:'file',toString:()=>uri},getLineCount:()=>text.split('\n').length,getValue:()=>text,getVersionId:()=>version };
@@ -13,7 +13,7 @@ test('renders real payload automatically, switches chats, and refuses stale cont
     createDecorationsCollection(){return {clear(){}};}
   };
   for(const name of ['onDidChangeModel','onDidChangeModelContent','onDidLayoutChange','onDidFocusEditorText','onDidChangeConfiguration','onDidDispose'])editor[name]=cb=>{events[name]=cb;return {dispose(){}};};
-  const context=vm.createContext({__codexDiffLabCommand:async (...args)=>{calls.push(args);return true;},queueMicrotask,setTimeout:()=>1,clearTimeout(){},console,document:{getElementById:()=>null,head:{appendChild(){}},createElement(tag){elements.push(tag);const node={style:{},setAttribute(){},remove(){},appendChild(){},addEventListener(name,fn){this[name]=fn;}};if(tag==='button')buttons.push(node);return node;}}});
+  const context=vm.createContext({__codexDiffLabCommand:async (...args)=>{calls.push(args);return true;},queueMicrotask,setTimeout:()=>1,clearTimeout(){},console,document:{getElementById:()=>null,head:{appendChild(){}},createElement(tag){elements.push(tag);const node={style:{},children:[],setAttribute(){},remove(){},appendChild(child){this.children.push(child);},addEventListener(name,fn){this[name]=fn;}};if(tag==='button')buttons.push(node);if(tag==='select')selects.push(node);return node;}}});
   vm.runInContext(fs.readFileSync('prototype/runtime-overlay.js','utf8'),context);
   context.__codexDiffLabAttach(editor);await new Promise(resolve=>queueMicrotask(resolve));
   const payload={documents:[{uri,after:'new\n',hunks:[{start:0,removed:['old','older'],added:['new']}]}]};
@@ -53,6 +53,25 @@ test('renders real payload automatically, switches chats, and refuses stale cont
   const emptyArrows=buttons.slice(beforeEmpty).filter(b=>b.textContent==='←'||b.textContent==='→');
   assert.equal(emptyArrows.length,2);
   assert.ok(emptyArrows.every(b=>b.disabled));
-
-
+  const otherChats=[{key:'other',title:'Polish navigation',files:['file:///project/other.js'],warnings:2}];
+  const beforeOther=buttons.length;
+  context.__codexDiffLabUpdate({documents:[],changedFiles:[],otherChats});
+  assert.equal(buttons.length,beforeOther,'Caught-up chat replaces disabled controls with the dropdown');
+  const dropdown=selects.at(-1);
+  assert.equal(dropdown.children[0].textContent,'Changes in 1 other chat');
+  assert.equal(dropdown.children[1].textContent,'Polish navigation · 1 file · ⚠ 2 unresolved');
+  dropdown.value='other';
+  await dropdown.change({stopPropagation(){}});
+  assert.equal(calls.at(-1)[1],'codexDiff.jumpToChat');
+  assert.equal(calls.at(-1)[2].key,'other');
+  assert.equal(dropdown.disabled,false);
+  assert.equal(dropdown.value,'');
+  context.__codexDiffLabUpdate({...actionable,changedFiles:[uri],otherChats});
+  assert.equal(selects.at(-1).children[0].textContent,'Other chats · 1');
+  const beforeRefresh=selects.length;
+  context.__codexDiffLabUpdate({...actionable,changedFiles:[uri],otherChats:[{...otherChats[0],title:'Renamed chat',files:['file:///project/other.js','file:///project/new.js']}]});
+  assert.equal(selects.length,beforeRefresh+1,'Other-chat-only updates refresh the strip');
+  assert.match(selects.at(-1).children[1].textContent,/Renamed chat · 2 files/);
+  context.__codexDiffLabUpdate({...actionable,changedFiles:[uri],otherChats:[]});
+  assert.equal(selects.length,beforeRefresh+1,'Dropdown disappears when other chats are caught up');
 });

@@ -11,8 +11,9 @@ function __codexDiffLabUpdate(payload) {
     documents.set(item.uri, item);
   }
   state.changedFiles=payload?.changedFiles||[];
+  state.otherChats=payload?.otherChats||[];
   state.navigationDocuments=new Map((payload?.navigationDocuments||payload?.documents||[]).map(d=>[d.uri,d]));
-  const signature = JSON.stringify([payload?.documents || [],state.changedFiles,payload?.navigationDocuments]);
+  const signature = JSON.stringify([payload?.documents || [],state.changedFiles,payload?.navigationDocuments,state.otherChats]);
   const changed = signature !== state.signature;
   state.signature = signature;
   if (changed) state.documents = documents;
@@ -29,7 +30,7 @@ function __codexDiffLabAttach(editor) {
     let navigator,navigatorSignature;
     function renderNavigator(model) {
       const item=model&&state.navigationDocuments?.get(model.uri.toString());
-      const signature=JSON.stringify([model?.uri.toString(),state.changedFiles||[],item]);
+      const signature=JSON.stringify([model?.uri.toString(),state.changedFiles||[],item,state.otherChats]);
       if(navigator&&navigator.isConnected!==false&&signature===navigatorSignature&&(!editor.getDomNode()?.getClientRects||editor.getDomNode().getClientRects().length))return;
       navigatorSignature=signature;
       navigator?.remove();navigator=undefined;
@@ -44,7 +45,31 @@ function __codexDiffLabAttach(editor) {
       navigator.addEventListener('mousedown',event=>event.stopPropagation());
       const index=files.indexOf(model.uri.toString());
       const label=document.createElement('span');label.textContent=index<0?`${files.length} files in this chat`:`${index+1} of ${files.length} files in this chat`;
-      for(const direction of [-1,1]){
+      const otherChats=state.otherChats||[];
+      if(otherChats.length){
+        const select=document.createElement('select');
+        select.className='codex-other-chats';
+        select.setAttribute('aria-label','Switch chat and open its first changed file');
+        select.title='Switch to another chat with pending changes in this repository';
+        const placeholder=document.createElement('option');
+        placeholder.value='';placeholder.disabled=true;placeholder.selected=true;
+        placeholder.textContent=files.length?`Other chats · ${otherChats.length}`:`Changes in ${otherChats.length} other ${otherChats.length===1?'chat':'chats'}`;
+        select.appendChild(placeholder);
+        for(const chat of otherChats){
+          const option=document.createElement('option');option.value=chat.key;
+          option.textContent=`${chat.title} · ${chat.files.length} ${chat.files.length===1?'file':'files'}${chat.warnings?` · ⚠ ${chat.warnings} unresolved`:''}`;
+          select.appendChild(option);
+        }
+        select.addEventListener('change',async event=>{
+          event.stopPropagation();
+          const key=select.value;if(!key)return;
+          select.disabled=true;
+          try{await __codexDiffLabCommand(editor,'codexDiff.jumpToChat',{key});}
+          finally{select.value='';select.disabled=false;}
+        });
+        navigator.appendChild(select);
+      }
+      for(const direction of files.length||!otherChats.length?[-1,1]:[]){
         const button=document.createElement('button');button.textContent=direction===-1?'←':'→';
         button.disabled=!files.length;
         button.setAttribute('aria-label',direction===-1?'Previous changed file':'Next changed file');
@@ -52,7 +77,7 @@ function __codexDiffLabAttach(editor) {
         if(direction===1)navigator.appendChild(label);
         navigator.appendChild(button);
       }
-      for(const action of ['reject','accept']){
+      for(const action of files.length||!otherChats.length?['reject','accept']:[]){
         const button=document.createElement('button');
         button.textContent=action==='accept'?'Accept File':'Reject File';
         button.className=action==='accept'?'codex-accept-file':'codex-reject-file';
@@ -157,6 +182,7 @@ function __codexDiffLabAttach(editor) {
       style.textContent += '.codex-diff-actions { display:flex; gap:6px; align-items:center; padding-left:8px; background:var(--vscode-editor-background); } .codex-diff-actions button { cursor:pointer; border:1px solid var(--vscode-button-border, transparent); border-radius:3px; padding:2px 8px; font:12px var(--vscode-font-family); color:var(--vscode-button-foreground); background:var(--vscode-button-background); } .codex-diff-actions button:hover { background:var(--vscode-button-hoverBackground); } .codex-diff-actions button:focus-visible { outline:1px solid var(--vscode-focusBorder); }';
       style.textContent += '.codex-diff-navigator { position:absolute; right:16px; top:0; height:22px; z-index:40; display:flex; align-items:center; gap:8px; padding:0 4px; color:var(--vscode-foreground); background:var(--vscode-breadcrumb-background, var(--vscode-editor-background)); font:12px var(--vscode-font-family); white-space:nowrap; pointer-events:auto; } .breadcrumbs-control:has(> .codex-diff-navigator) { position:relative; padding-right:410px; box-sizing:border-box; } .codex-diff-navigator button { background:transparent; color:inherit; border:0; padding:2px 6px; cursor:pointer; } .codex-diff-navigator button:hover { background:var(--vscode-toolbar-hoverBackground); } .codex-diff-navigator button.codex-accept-file { background:var(--vscode-button-background); color:var(--vscode-button-foreground); border-radius:3px; } .codex-diff-navigator button:disabled { opacity:.45; cursor:default; } .codex-diff-navigator button:focus-visible { outline:1px solid var(--vscode-focusBorder); }';
       style.textContent += '.monaco-workbench.mac { font-family: -apple-system, BlinkMacSystemFont, sans-serif !important; } .monaco-workbench { --vscode-font-family: -apple-system, BlinkMacSystemFont, sans-serif; }';
+      style.textContent += '.codex-diff-navigator { max-width:calc(100% - 24px); overflow-x:auto; } .breadcrumbs-control:has(> .codex-diff-navigator .codex-other-chats) { padding-right:620px; } .codex-diff-navigator .codex-other-chats { min-width:0; max-width:220px; height:21px; flex-shrink:0; font:inherit; color:var(--vscode-dropdown-foreground); background:var(--vscode-dropdown-background); border:1px solid var(--vscode-dropdown-border, transparent); border-radius:3px; cursor:pointer; } .codex-other-chats:focus-visible { outline:1px solid var(--vscode-focusBorder); outline-offset:-1px; }';
       document.head.appendChild(style);
     }
     const entry = { editor, render, report: () => ({ uri: editor.getModel()?.uri.toString(), status, navigator:!!navigator, changedFiles:state.changedFiles?.length||0, deletedBlocks: nodes.length, actionBars: controls.length,

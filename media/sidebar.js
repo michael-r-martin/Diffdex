@@ -9,8 +9,9 @@ window.addEventListener('message',event=>{
 
   const available=state.files.filter(f=>!f.warning).reduce((n,f)=>n+(f.hunks?.length||0),0);
   const skipped=state.files.filter(f=>f.warning).length;
-  document.getElementById('summary').textContent=state.chat?`${available} blocks ready to review${skipped?` · ${skipped} unresolved files`:''}`:'Waiting for captured changes';
-  document.getElementById('notice').textContent=state.notice||(skipped?`Accept all / Reject all apply only to ready blocks. Resolve the ${skipped} unresolved file(s) below separately.`:'This panel shows the selected chat. Inline diffs can also belong to other chats.');
+  const readyFiles=state.files.filter(f=>!f.warning&&f.hunks?.length).length;
+  document.getElementById('summary').textContent=state.chat?`${available} ${available===1?'block':'blocks'} in ${readyFiles} ${readyFiles===1?'file':'files'} ready to review${skipped?` · ${skipped} unresolved ${skipped===1?'file':'files'}`:''}`:'Waiting for captured changes';
+  document.getElementById('notice').textContent=state.notice||(skipped?`Accept all / Reject all apply only to ready blocks. Resolve the ${skipped} unresolved ${skipped===1?'file':'files'} below separately.`:'Reviewing the selected chat. Rejected changes stay unsaved; undo is available in each file.');
   const container=document.getElementById('files');const scroll=window.scrollY;container.replaceChildren();
   for(const file of state.files){
     if(!file.hunks?.length&&!file.warning)continue;
@@ -41,7 +42,7 @@ window.addEventListener('message',event=>{
       section.append(code);
     }container.append(section);
   }
-  if(!container.childNodes.length)container.append(el('p',state.chat?'No changes ready to review in the current file versions.':'Make a Codex edit to start reviewing.','empty'));
+  if(!container.childNodes.length)container.append(el('p',state.chat?'You’re all caught up. New changes from this chat will appear here.':'Make a Codex edit to start reviewing.','empty'));
   document.getElementById('chat').textContent=`${state.chat||'Select a chat'} ▾`;
   document.getElementById('chat').title='Switch chat — see which chats have pending changes';
   document.getElementById('chat').disabled=waiting;

@@ -2,6 +2,22 @@
 
 The two synchronous hooks observe all tool calls. `apply_patch` keeps its targeted file capture; other tools snapshot supported workspace files before and after the call. Only changed files acquire a first baseline for that chat. PostToolUse saves actual resulting contents, including absence for deleted files. They do not edit source files or return permission decisions.
 
+## Client compatibility
+
+Capture consumes Codex's `PreToolUse` and `PostToolUse` events, including the session ID and working directory. It does not depend on the IDE extension's chat-selection adapter. This supports local sessions from the Codex terminal UI, Codex Mac app and embedded IDE extension when they load and run the project's trusted command hooks.
+
+Open the same checkout in Diffdex and the Codex client. For a separate worktree, enable capture in that worktree and open it in Diffdex. Remote/cloud execution is outside this local filesystem workflow.
+
+Automatic following of the selected chat is specific to the patched embedded IDE extension. Select terminal or Mac-app sessions manually using Diffdex's chat picker or cross-chat dropdown.
+
+The project records a successful live Mac-app capture and automated hook-to-editor tests. Terminal compatibility follows the documented CLI hook protocol and the client-independent capture implementation; a separate live interactive TUI smoke test has not been recorded. Use a current hook-capable client and confirm a small edit appears after setup.
+
+## Install capture
+
+For an installed Diffdex app, run **Diffdex: Enable Change Capture for Project** in its command palette. This points hooks at the installed app's runtime and permanent capture store.
+
+For development from this repository, use:
+
 ```sh
 node scripts/install-hooks.cjs /absolute/path/to/project
 ```
