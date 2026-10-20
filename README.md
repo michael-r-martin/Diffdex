@@ -50,6 +50,8 @@ npm run setup:mac
 npm run setup:codex
 ```
 
+The `cd diffdex` command enters the repository folder created by `git clone`. Keep using this same terminal for the build and Finder commands below; both run from inside that folder.
+
 Setup prepares isolated copies inside the checkout. It leaves your existing VS Code and extension installations intact.
 
 Build the app:
@@ -58,14 +60,21 @@ Build the app:
 npm run package:mac -- dist/my-first-build
 ```
 
-The build runs automated checks and creates `dist/my-first-build/Diffdex.app`.
+The build runs automated checks and creates `dist/my-first-build/Diffdex.app`. Signing the app and creating the ZIP can take several minutes with no new terminal output, including after the `replacing existing signature` message. Wait until the command finishes successfully and prints `Verified local package` before installing.
 
-1. Open `dist/my-first-build` in Finder.
-2. Drag `Diffdex.app` into `/Applications`.
-3. Launch Diffdex and open your project with **File → Open Folder**.
-4. Use the embedded Codex extension, or keep working in your Codex terminal UI or Mac app.
+In that same terminal, open the finished build folder in Finder:
 
-If you are replacing an existing Diffdex installation, quit it first. Use a new build output directory each time.
+```sh
+open dist/my-first-build
+```
+
+1. Quit Diffdex if it is already running.
+2. Drag `Diffdex.app` from the build folder into **Applications** in Finder. If prompted, choose **Replace**. You do not need to delete the old app first.
+3. Open **Applications** and double-click **Diffdex** to launch it. You can also find it with Spotlight (`⌘Space`, then type `Diffdex`).
+4. Open your project with **File → Open Folder**.
+5. Use the embedded Codex extension, or keep working in your Codex terminal UI or Mac app. Sign in to Codex if prompted, then enable change capture using the steps below.
+
+Use a new build output directory each time you rebuild, such as `dist/my-next-build`.
 
 The app is signed for local use but is not notarized by Apple. If macOS blocks it, check the build's verification output and the [signing guidance](docs/releasing.md#8-signing-and-download-delivery).
 
