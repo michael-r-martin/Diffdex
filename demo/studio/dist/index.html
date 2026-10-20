@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A little home for the things you want to make.">
+  <title>Weekend Studio — make something small</title>
+  <script src="theme.js"></script>
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div class="ambient-background" aria-hidden="true">
+    <span></span><span></span><span></span>
+  </div>
+  <div class="shell">
+    <header class="masthead">
+      <a class="brand" href="#"><span aria-hidden="true">✳</span> Weekend Studio</a>
+      <div class="masthead-tools">
+        <span class="edition">A LITTLE SPACE FOR BIG IDEAS · VOL. 01</span>
+        <div class="theme-switcher" role="group" aria-label="Color theme">
+          <button type="button" data-theme-choice="light" aria-pressed="false">Light</button>
+          <button type="button" data-theme-choice="dark" aria-pressed="false">Dark</button>
+          <button type="button" data-theme-choice="system" aria-pressed="true">System</button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="intro" aria-labelledby="headline">
+        <div>
+          <p class="eyebrow"><span class="status-dot" aria-hidden="true"></span> OFF THE CLOCK. ON TO SOMETHING.</p>
+          <h1 id="headline">Small ideas.<br>Good <em>weekends.</em></h1>
+          <p class="lede">Pick one thing, give it an afternoon, and see where it takes you. Your next side project starts right here.</p>
+          <button class="primary-link" type="button" data-open-idea aria-haspopup="dialog" aria-controls="idea-dialog">Put an idea on the board <span aria-hidden="true">↗</span></button>
+        </div>
+        <figure class="studio-art">
+          <img src="assets/weekend-workbench.jpg" width="1536" height="1024" fetchpriority="high" alt="A paper-and-clay creative workbench with a sketchbook, tiny laptop, lavender pencil, and peach coffee cup.">
+          <figcaption><span aria-hidden="true">✳</span> It doesn’t have to be perfect. <em>Just get started.</em></figcaption>
+        </figure>
+      </section>
+
+      <section class="workspace" aria-labelledby="board-title">
+        <div class="board">
+          <div class="section-heading">
+            <h2 id="board-title"><span class="section-index" aria-hidden="true">01 /</span> On the workbench <span id="project-count">0</span></h2>
+            <span class="progress-label" id="progress-label">0 finished</span>
+          </div>
+          <div class="board-filters">
+          <div class="filters" role="group" aria-label="Filter projects by category">
+            <button type="button" data-filter="All" aria-pressed="true">All projects</button>
+            <button type="button" data-filter="Design" aria-pressed="false">Design</button>
+            <button type="button" data-filter="Code" aria-pressed="false">Code</button>
+            <button type="button" data-filter="Life" aria-pressed="false">Life</button>
+          </div>
+          <div class="status-filter">
+            <label for="status-filter">Show</label>
+            <select id="status-filter">
+              <option value="all">All statuses</option>
+              <option value="unfinished">Unfinished</option>
+              <option value="finished">Finished</option>
+            </select>
+          </div>
+          </div>
+          <div id="project-list" class="project-list"></div>
+          <p id="empty-state" class="empty-state" hidden>No projects here yet. Give that next idea a home.</p>
+          <p id="feedback" class="feedback" role="status" aria-live="polite"></p>
+        </div>
+
+        <aside class="idea-panel">
+          <p class="eyebrow">02 / THE IDEA INBOX <span aria-hidden="true">↙</span></p>
+          <h2>What will you try next?</h2>
+          <p class="inbox-copy">A tiny experiment, a weekend adventure, or that thing you keep meaning to make. Give it a home.</p>
+          <button class="submit-button" type="button" data-open-idea aria-haspopup="dialog" aria-controls="idea-dialog">Add an activity <span aria-hidden="true">+</span></button>
+          <p class="form-hint">Small is a perfectly good place to start.</p>
+        </aside>
+      </section>
+    </main>
+
+    <footer><span>Made for the joy of making.</span><button class="motion-toggle" type="button" aria-pressed="false">Pause background</button><span>Saved in this browser · no account needed</span></footer>
+  </div>
+  <dialog id="idea-dialog" class="idea-dialog" aria-labelledby="idea-dialog-title" aria-describedby="idea-dialog-description">
+    <div class="dialog-heading">
+      <span class="dialog-star" aria-hidden="true">✳</span>
+      <button class="dialog-close" type="button" data-close-idea aria-label="Close add activity">×</button>
+    </div>
+    <p class="eyebrow">A LITTLE ROOM FOR SOMETHING NEW</p>
+    <h2 id="idea-dialog-title">Start with a <em>small idea.</em></h2>
+    <p id="idea-dialog-description" class="dialog-description">No grand plan needed. Just something you’d like to try.</p>
+    <form id="idea-form">
+            <label for="idea-title">What do you want to make?</label>
+            <input id="idea-title" name="title" placeholder="A tiny thing that would be nice…" maxlength="80" required autofocus>
+            <label for="idea-category">Give it a corner</label>
+            <select id="idea-category" name="category">
+              <option>Design</option><option>Code</option><option>Life</option>
+            </select>
+            <label for="idea-note">A note to get you started <span>(optional)</span></label>
+            <textarea id="idea-note" name="note" rows="3" maxlength="180" placeholder="The first step could be…"></textarea>
+            <div class="dialog-actions">
+              <button class="cancel-button" type="button" data-close-idea>Maybe later</button>
+              <button class="submit-button" type="submit">Add to the workbench <span aria-hidden="true">↗</span></button>
+            </div>
+            <p class="form-hint">Try something you could finish in an afternoon. You can always dream bigger later.</p>
+          </form>
+  </dialog>
+  <template id="project-template">
+    <article class="project-card">
+      <div class="card-top"><span class="category"></span><span class="project-number"></span></div>
+      <h3></h3>
+      <p class="project-note"></p>
+      <button class="done-button" type="button" aria-pressed="false"><span class="check" aria-hidden="true">○</span><span class="done-label">Mark as done</span></button>
+    </article>
+  </template>
+</body>
+</html>

@@ -4,3 +4,5 @@ node_modules/
 coverage/
 *.vsix
 *.log
+.codex/hooks.json
+.codex/hooks.json.*
