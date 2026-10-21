@@ -14,7 +14,7 @@ The project records a successful live Mac-app capture and automated hook-to-edit
 
 ## Install capture
 
-For an installed Diffdex app, run **Diffdex: Enable Change Capture for Project** in its command palette. This points hooks at the installed app's runtime and permanent capture store.
+An installed Diffdex app installs hooks automatically when you open a trusted local project or add a folder to the workspace. The setup notification offers **View hooks** and explains Codex's trust step. To retry setup, run **Diffdex: Enable Change Capture for Project** in its command palette. This points hooks at the installed app's runtime and permanent capture store. Untrusted workspaces and remote folders do not receive automatic hook installation.
 
 For development from this repository, use:
 

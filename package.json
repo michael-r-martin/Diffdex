@@ -19,7 +19,7 @@
     "build:mac": "node packaging/build-macos.cjs",
     "verify:mac": "node packaging/verify-macos.cjs",
     "test": "node --test test/*.test.js",
-    "check": "node --check src/extension.js && node --check src/diff.js && node --check prototype/runtime-overlay.js && node --check prototype/patch-copy.cjs && sh -n prototype/launch-copy.sh && node --check hooks/capture.cjs && node --check scripts/install-hooks.cjs && node --check src/store.js && node --check src/review.js && node --check prototype/review-undo.js && node --check src/merge.js && node --check packaging/editor-source.cjs && node --check packaging/setup-codex.cjs && node --check packaging/build-macos.cjs && node --check packaging/verify-macos.cjs && node --check packaging/package-macos.cjs"
+    "check": "node --check src/extension.js && node --check src/setup.js && node --check src/diff.js && node --check prototype/runtime-overlay.js && node --check prototype/patch-copy.cjs && sh -n prototype/launch-copy.sh && node --check hooks/capture.cjs && node --check scripts/install-hooks.cjs && node --check src/store.js && node --check src/review.js && node --check prototype/review-undo.js && node --check src/merge.js && node --check packaging/editor-source.cjs && node --check packaging/setup-codex.cjs && node --check packaging/build-macos.cjs && node --check packaging/verify-macos.cjs && node --check packaging/package-macos.cjs"
   },
   "contributes": {
     "commands": [

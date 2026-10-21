@@ -2,7 +2,7 @@ const { projectReview } = require('./project-review');
 const { planRejection, advanceReview } = require('./review-actions');
 const { chatPickerItems } = require('./chat-picker');
 const { chatNavigationItems } = require('./chat-navigation');
-const { captureCommand, installProjectHooks } = require('./setup');
+const { registerCaptureSetup } = require('./setup');
 const vscode = require('vscode');
 const path = require('node:path');
 const fs = require('node:fs');
@@ -20,6 +20,7 @@ function activate(context) {
     : path.join(context.extensionPath, '.prototype-runtime/captures'));
   const readTitles=createTitleReader();
   const log = vscode.window.createOutputChannel('Codex Diffs');
+  registerCaptureSetup(vscode, context, { packaged, captureStore, log });
   const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
   status.command = 'codexDiff.selectChat'; status.show();
   const treeChanged = new vscode.EventEmitter();
@@ -189,18 +190,6 @@ function activate(context) {
     }
   }
   context.subscriptions.push(log, status, treeChanged,
-    vscode.commands.registerCommand('codexDiff.enableCapture', async () => {
-      const folders = vscode.workspace.workspaceFolders || [];
-      if (!folders.length) { vscode.window.showInformationMessage('Open a project folder, then run Diffdex: Enable Change Capture for Project.'); return; }
-      const folder = folders.length === 1 ? folders[0] : await vscode.window.showWorkspaceFolderPick({ placeHolder: 'Choose the project to capture' });
-      if (!folder) return;
-      try {
-        const executable = packaged ? path.resolve(vscode.env.appRoot, '../../MacOS/Diffdex') : process.execPath;
-        const file = installProjectHooks(folder.uri.fsPath, captureCommand(context.extensionPath, captureStore(), executable));
-        const action = await vscode.window.showInformationMessage('Capture hooks installed. Review and trust them in Codex before use; you may need to start a new chat.', 'View hooks');
-        if (action) await vscode.window.showTextDocument(vscode.Uri.file(file));
-      } catch (error) { vscode.window.showErrorMessage(`Diffdex could not set up capture: ${error.message}`); }
-    }),
     vscode.commands.registerCommand('codexDiff.followChat',async request=>{
       if(request?.id!==null&&(typeof request?.id!=='string'||!request.id.length||request.id.length>200))return false;
       followedChatId=request.id;
