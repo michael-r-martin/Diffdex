@@ -80,10 +80,10 @@ The app is signed for local use but is not notarized by Apple. If macOS blocks i
 
 ## Review your first changes
 
-Enable change capture once for each project:
+Diffdex installs capture hooks automatically when you open a trusted local project, including folders added to a workspace. Complete Codex's trust step once for each project:
 
-1. Open the command palette (`⇧⌘P`) and run **Diffdex: Enable Change Capture for Project**.
-2. Review the generated `.codex/hooks.json`. Existing unrelated hooks are preserved.
+1. Open the project folder in Diffdex and trust the workspace if prompted.
+2. Choose **View hooks** in the setup notification to review the generated `.codex/hooks.json`. Existing unrelated hooks are preserved. To retry setup, run **Diffdex: Enable Change Capture for Project** from the command palette (`⇧⌘P`).
 3. Run `codex` in that checkout and use `/hooks` to review and trust the two capture handlers. If necessary, reload the client/session you will use or start a fresh chat so it loads the configuration.
 4. Ask Codex to make a small edit from your chosen client. Open the file in Diffdex to review it, and select the captured session in **Review Changes**.
 

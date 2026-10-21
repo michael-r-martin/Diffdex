@@ -35,7 +35,8 @@ test('jump command switches selection, opens the first pending file, and refuses
       if(name==='_codexDiff.setChanges'){payloads.push(args[0]);ready();return [];}
       return commands.get(name)?.(...args);
     }},
-    workspace:{workspaceFolders:[{uri:uri(root)}],textDocuments:[],getConfiguration:()=>({get:()=>undefined}),onDidChangeTextDocument:disposable},
+    workspace:{workspaceFolders:[{uri:uri(root)}],textDocuments:[],getConfiguration:()=>({get:()=>undefined}),onDidChangeTextDocument:disposable,
+      onDidChangeWorkspaceFolders:disposable,onDidGrantWorkspaceTrust:disposable},
     window:{createOutputChannel:()=>({appendLine(){}}),createStatusBarItem:()=>({show(){}}),
       registerTreeDataProvider:disposable,registerWebviewViewProvider:disposable,onDidChangeVisibleTextEditors:disposable,
       async showTextDocument(value){opened.push(value.toString());},showInformationMessage(message){messages.push(message);}}
