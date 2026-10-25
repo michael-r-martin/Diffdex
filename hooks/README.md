@@ -24,7 +24,7 @@ node scripts/install-hooks.cjs /absolute/path/to/project
 
 The installer merges with existing `.codex/hooks.json` and backs up an existing file. Generated configuration contains machine-specific absolute paths and is ignored by Git. Snapshots live in this prototype's ignored `.prototype-runtime/captures` directory with owner-only file permissions. Nothing is uploaded.
 
-Codex requires trust for the project config layer and the exact hook definitions. Open `codex` in the project, run `/hooks`, review the two capture handlers, and trust them. Changing the matcher from `^apply_patch$` to `.*` changes the hook definitions and may require renewed trust. No trust bypass is used. Existing desktop chats may need their configuration reloaded (or a fresh chat) before discovering newly installed hooks.
+Codex requires trust for the project config layer and the exact hook definitions. Open `codex` in the project, run `/hooks`, review the two capture handlers, and trust them. Changing the matcher from `^apply_patch$` to `.*` changes the hook definitions and may require renewed trust. No trust bypass is used. Existing desktop chats may need their configuration reloaded (or a fresh chat) before discovering newly installed hooks. If capture still does not start, fully quit and reopen Diffdex and the ChatGPT Mac app (if you are using it), then try a new edit. Restarting both apps was needed in a confirmed setup.
 
 Each checkout path and session ID has separate storage. Parent and subagent edits share the parent session ID supplied by Codex. The first baseline survives later turns, while each chat retains its own latest captured contents. Chat titles are resolved separately from the local Codex session index.
 

@@ -54,9 +54,27 @@ See [hook setup](../hooks/README.md) and [disposable app setup](../prototype/DIS
 
 ## Accept and reject
 
-Each rendered block has a compact action row. Buttons call `codexDiff.reviewBlock` through the private command-service bridge. The extension validates the selected chat, exact editor text, and a hash of current block boundaries before acting. Accept removes the block from local review state without changing source text. Reject applies an undoable workspace edit restoring that block’s original lines, then removes its overlay. Neither action saves the document automatically. Decisions persist in isolated workspace state for that captured snapshot; a subsequent Codex snapshot resets the file’s review.
+Each rendered block has a compact action row. Buttons call `codexDiff.reviewBlock` through the private command-service bridge. The extension validates the selected chat, exact editor text, and a hash of current block boundaries before acting. Accept removes the block from local review state without changing source text. Reject applies an undoable workspace edit restoring that block’s original lines, then removes its overlay. Both actions save the document through `src/review-save.js` and the private `_codexDiff.saveReviewFile` workbench command. The native text file service retains conflict checks and skips save participants so formatting cannot add undo steps. Save failures are reported; the decision remains applied and undoable.
 
 Accept also pushes a resource-scoped entry into VS Code’s native undo/redo service through `prototype/review-undo.js`. It stores the before/after review regions, closes the preceding text-edit undo group, and restores review state through the companion extension. No dummy text edit is inserted. Restoration checks the captured snapshot and editor contents before applying, so an obsolete undo entry cannot overwrite newer capture state.
+
+Undo/redo of acceptance saves through the same review saver. Undo/redo of rejection is recognized by its explicit before/after snapshots and schedules a save after the native undo operation completes. Ordinary typing and unrelated undo/redo do not request review saves. Saves are serialized per file, and a pending undo save is skipped if further typing changes the document before it runs.
+
+Successful review saves persist the saved text with the file's review state. This becomes the common base for the next incoming capture, so saved rejections and personal edits are not mistaken for new conflicts against an older hook snapshot. Once that capture is reconciled, its contents become the incoming merge baseline again.
+
+## Git checkpoints
+
+`src/git-review.js` reconciles captures with the local repository during refresh. It only settles a file when Git reports no staged or working-tree changes, the file matches the committed blob in `HEAD`, and any open buffer is clean and matches that blob. Committed deletions settle when the path is absent from both `HEAD` and disk. Untracked and ignored existing files, dirty buffers, non-Git folders, and Git failures retain their reviews. Partial commits across files settle the clean files independently; a file with remaining uncommitted changes stays in review.
+
+Settled capture fingerprints and committed contents persist in workspace state. The extension clears their pending regions and conflicts without deleting hook history or writing source files. A new capture in the same chat uses the checkpoint as its starting baseline, preventing committed changes from reappearing. Branch changes update that baseline to the current checkout. Each linked worktree is checked against its own `HEAD`; no push or network request is needed.
+
+A saved rejection that restores `HEAD` is not treated as a committed checkpoint. Git reconciliation consults the live review's rejection records and preserves its undo metadata, including across relaunches. Undo revives the pending regions and saves the restored proposal; redo saves the rejection again. A later commit of the proposal still settles the review normally. Checkpoints incorrectly created by the earlier cleanup are released when their original proposal is restored in a dirty buffer or working tree.
+
+Review saves pass the expected disk version to the workbench bridge. If an external capture arrived before the editor's file watcher updated its metadata, the bridge refreshes the saved stat only after reading an exact match for those known contents. The subsequent native save retains its etag/mtime checks, so a newer external write still causes a conflict instead of being silently overwritten.
+
+## Explorer file attachments
+
+`src/chat-context.js` contributes **Add to Codex Chat** to Explorer's file context menu and forwards the clicked file URIs to the bundled `chatgpt.addFileToThread` command. Multi-selection is supported; folders and non-file resources are skipped. `scripts/codex-file-context.cjs` patches the pinned native attachment helper to preserve the last focused Codex editor-panel chat before it can switch to the sidebar. Sidebar startup and pending attachment queueing use the native path. Attachments populate the composer without sending a message.
 
 ## Incoming edits while the editor is dirty
 

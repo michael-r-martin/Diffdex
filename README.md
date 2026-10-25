@@ -11,7 +11,8 @@ Diffdex brings inline code review to your Codex workflow in a standalone macOS e
 - **Follow the conversation automatically inside the IDE.** Switch chats in the embedded Codex extension and the review sidebar and file navigator follow the selected chat. Terminal and Mac-app sessions can be selected from Diffdex's chat picker.
 - **Find unfinished reviews across chats.** The top strip shows when other chats have pending changes. Pick one to jump straight to its first changed file.
 - **Stay in a full IDE.** Browse your project, edit files, use the integrated terminal, and review AI changes in one VS Code-based application.
-- **Change your mind with undo.** Accept and reject decisions support normal undo/redo. Rejected changes stay in an unsaved buffer so you can inspect them before saving.
+- **Change your mind with undo.** Accept and reject decisions support normal undo/redo. Each decision, including undo and redo, automatically saves the affected file.
+- **Add files to your chat.** Right-click a file in Explorer and choose **Add to Codex Chat** to attach it to the active embedded Codex chat. You can select several files at once.
 
 Diffdex is experimental and currently supports Apple Silicon Macs. You build the app locally using the setup commands below.
 
@@ -84,14 +85,18 @@ Diffdex installs capture hooks automatically when you open a trusted local proje
 
 1. Open the project folder in Diffdex and trust the workspace if prompted.
 2. Choose **View hooks** in the setup notification to review the generated `.codex/hooks.json`. Existing unrelated hooks are preserved. To retry setup, run **Diffdex: Enable Change Capture for Project** from the command palette (`⇧⌘P`).
-3. Run `codex` in that checkout and use `/hooks` to review and trust the two capture handlers. If necessary, reload the client/session you will use or start a fresh chat so it loads the configuration.
+3. Run `codex` in that checkout and use `/hooks` to review and trust the two capture handlers. If necessary, reload the client/session you will use or start a fresh chat so it loads the configuration. If capture still does not start, fully quit and reopen Diffdex and the ChatGPT Mac app (if you are using it), then try a new edit. Restarting both apps was needed in a confirmed setup.
 4. Ask Codex to make a small edit from your chosen client. Open the file in Diffdex to review it, and select the captured session in **Review Changes**.
 
 When using the embedded extension, switching Codex chats automatically updates the review selection. For terminal and Mac-app sessions, choose the chat manually or use **Other chats** in the top strip to jump to its pending changes.
 
-**Accept** clears a review overlay while keeping the code. **Reject** restores the previous code in the editor and leaves the file unsaved. Normal undo restores review decisions.
+**Accept** clears a review overlay while keeping the code. **Reject** restores the previous code in the editor. Both actions automatically save the affected file, including other edits in that file. Undo and redo of those decisions also save automatically. Review saves skip formatting and other save participants to preserve the review's undo history; normal manual saves keep your configured behavior. Save failures are reported and leave the decision available to undo.
+
+To attach files, right-click a file in the standard Explorer tree and choose **Add to Codex Chat**. The file goes to the active embedded Codex chat's composer; it does not send a message. This also works with multiple selected files and files you have not opened. It does not attach files to a separate terminal or Mac-app chat.
 
 Only edits made after capture is enabled are available for review. See [capture scope and limitations](hooks/README.md) for supported files, concurrent edits and scan limits.
+
+Committed files leave the pending review automatically once their saved contents match Git's current `HEAD` and they have no staged or unsaved changes. A push is not required. Diffdex remembers that checkpoint so later Codex edits in the same chat start from the committed version. Rejecting back to the committed contents can also make Git clean; that decision stays undoable, and Undo restores its diff for review. Files that still have uncommitted changes stay available for review; non-Git projects keep the chat snapshot workflow.
 
 ## Updating and storage
 
@@ -116,7 +121,8 @@ Before uninstalling, remove Diffdex's capture handlers from each project's `.cod
 | Editor or extension setup fails | Check your internet connection and rerun the setup command. Setup requires specific supported versions; do not substitute newer versions manually. |
 | Editor download hash mismatch | Stop and report the error rather than bypassing verification. |
 | Output directory already exists | Choose a fresh directory, such as `dist/my-next-build`. |
-| No changes appear | Enable capture for the project, trust the hooks, reload the chat and make a new edit. |
+| No changes appear | Enable capture for the project, trust the hooks, reload the chat and make a new edit. If needed, fully quit and reopen Diffdex and the ChatGPT Mac app before trying another edit. |
+| Old diffs remain after committing | Use a build with Git reconciliation. Clean committed files clear automatically on refresh; check for staged changes or unsaved buffers if a file remains pending. |
 | Review selection stops following Codex | Rerun `npm run setup:codex` and rebuild. Use the manual chat picker while diagnosing. |
 | Incoming changes conflict with unsaved work | Use the offered conflict-resolution controls to choose which changes to keep. |
 
@@ -124,11 +130,14 @@ For custom editor/extension locations and exact supported versions, see the [pac
 
 ## Roadmap
 
+- [x] **Add files to Codex chat from the Explorer.** Right-click files in the standard file tree and choose **Add to Codex Chat** to attach them to the active embedded Codex chat.
+- [x] **Save files automatically after review actions.** Accept, reject, and undo/redo of those decisions automatically save the affected file, preserving undo history and reporting save failures.
+- [ ] **Explore syncing review decisions back to Codex.** Investigate whether Diffdex can communicate accepted and rejected changes to the Codex chat so its change indicator reflects the review state. Feasibility depends on the integration available in Codex.
 - [ ] **Follow the latest edits across Codex clients.** Add an optional mode that selects the chat that most recently changed a file, including TUI and Mac-app sessions. Pause automatic following when you manually select a chat so background tasks do not interrupt your review.
 - [ ] **Explore following the active TUI or Mac-app chat.** Investigate client signals for switching review context when you switch conversations, even before an edit occurs.
 - [ ] **Ship a fully distributable app.** Move to a source-built Code - OSS foundation, resolve third-party extension and integration permissions, and provide signed, notarized macOS downloads with a tested update path—so installation no longer requires a local build.
 
-These are planned directions, not released features. See the [release guide](docs/releasing.md) for the distribution work in more detail.
+Unchecked items are planned directions. See the [release guide](docs/releasing.md) for the distribution work in more detail.
 
 ## Development
 

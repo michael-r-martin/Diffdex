@@ -3,6 +3,10 @@ const { planRejection, advanceReview } = require('./review-actions');
 const { chatPickerItems } = require('./chat-picker');
 const { chatNavigationItems } = require('./chat-navigation');
 const { registerCaptureSetup } = require('./setup');
+const { registerChatContext } = require('./chat-context');
+const { createReviewSaver } = require('./review-save');
+const { readDisk, traceWrite, fingerprint } = require('./write-diagnostics');
+const { createGitReview } = require('./git-review');
 const vscode = require('vscode');
 const path = require('node:path');
 const fs = require('node:fs');
@@ -21,6 +25,12 @@ function activate(context) {
   const readTitles=createTitleReader();
   const log = vscode.window.createOutputChannel('Codex Diffs');
   registerCaptureSetup(vscode, context, { packaged, captureStore, log });
+  registerChatContext(vscode, context);
+  const reviewSaver = createReviewSaver(vscode, log, async doc => {
+    for (const review of reviews.values()) if (review.uri === doc.uri.toString()) review.savedText = doc.getText();
+    await saveReviews();
+  });
+  context.subscriptions.push(reviewSaver);
   const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
   status.command = 'codexDiff.selectChat'; status.show();
   const treeChanged = new vscode.EventEmitter();
@@ -33,6 +43,7 @@ function activate(context) {
   }));
   let saveTimer;
   const incoming = new Map(context.workspaceState.get('pendingIncoming') || []);
+  const gitReview = createGitReview(context.workspaceState.get('gitReviewCheckpoints') || []);
   const migration = !context.workspaceState.get('incomingSyncVersion');
   const migrationChecked = new Set();
   let sidebarActionBusy=false;
@@ -46,7 +57,11 @@ function activate(context) {
     if(message?.type==='chat') return vscode.commands.executeCommand('codexDiff.selectChat');
     return vscode.commands.executeCommand('codexDiff.sidebarAction',message);
   });
-  async function replaceBuffer(doc,text) {
+  async function replaceBuffer(doc,text,source,expectedDisk) {
+    if (readDisk(doc)!==expectedDisk) {
+      traceWrite(log,source,'blocked-disk-changed',doc,{expectedDiskHash:fingerprint(expectedDisk)});
+      return false;
+    }
     const current=doc.getText();
     if (current===text) return true;
     let start=0,end=current.length,nextEnd=text.length;
@@ -54,6 +69,7 @@ function activate(context) {
     while(end>start&&nextEnd>start&&current[end-1]===text[nextEnd-1]) {end--;nextEnd--;}
     const edit=new vscode.WorkspaceEdit();
     edit.replace(doc.uri,new vscode.Range(doc.positionAt(start),doc.positionAt(end)),text.slice(start,nextEnd));
+    traceWrite(log,source,'buffer-replace',doc,{targetHash:fingerprint(text)});
     return vscode.workspace.applyEdit(edit);
   }
   function queueIncoming(key,file,signature) {
@@ -67,7 +83,7 @@ function activate(context) {
 
   const reviewVersion = review => createHash('sha256').update(JSON.stringify(review.regions)).digest('hex');
   async function saveReviews() {
-    await context.workspaceState.update('reviewRegions',[...reviews].map(([key,r])=>[key,{text:r.text,regions:r.regions,rejections:r.rejections,supported:r.supported,signature:r.signature,uri:r.uri}]));
+    await context.workspaceState.update('reviewRegions',[...reviews].map(([key,r])=>[key,{text:r.text,regions:r.regions,rejections:r.rejections,supported:r.supported,signature:r.signature,uri:r.uri,savedText:r.savedText}]));
     await context.workspaceState.update('pendingIncoming',[...incoming]);
   }
   const tree = {
@@ -94,6 +110,18 @@ function activate(context) {
       const store = captureStore();
       const roots = (vscode.workspace.workspaceFolders || []).map(f => { try { return fs.realpathSync(f.uri.fsPath); } catch { return f.uri.fsPath; } });
       sessions = packaged && !roots.length ? [] : listSessions(store, roots);
+      const gitState = await gitReview.reconcile(sessions, vscode.workspace.textDocuments,
+        (chat, file) => reviews.get(`${chat}:${vscode.Uri.file(file).toString()}`));
+      if (disposed) return;
+      sessions = gitState.sessions;
+      let clearedReviews = false;
+      for (const file of gitState.cleared) {
+        const key = `${file.chat}:${vscode.Uri.file(file.path).toString()}`;
+        if (reviews.delete(key)) clearedReviews = true;
+        if (incoming.delete(key)) clearedReviews = true;
+      }
+      if (gitState.changed) await context.workspaceState.update('gitReviewCheckpoints', gitReview.checkpoints());
+      if (clearedReviews) await saveReviews();
       const titles=readTitles();
       sessions=sessions.map(s=>({...s,title:titles.get(s.sessionId)||'Untitled chat'}));
       if(followedChatId!==undefined)selected=sessions.find(s=>s.sessionId===followedChatId)?.key;
@@ -127,19 +155,22 @@ function activate(context) {
         let review = reviews.get(key);
         const migrate=migration&&!migrationChecked.has(key)&&open?.isDirty&&current!==file.after.text;
         migrationChecked.add(key);
-        if (isLatest && open && current!==file.after.text && (migrate || !review || review.signature!==signature)) {
-          const base=review?.signature ? JSON.parse(review.signature)[1] : null;
+        // Captures are historical evidence, never authority over a newer disk file.
+        // Only merge an incoming capture while it is still the actual disk text.
+        if (isLatest && open && current!==file.after.text && (migrate || !review || review.signature!==signature) && readDisk(open)===file.after.text) {
+          const base=review?.signature ? review.savedText ?? JSON.parse(review.signature)[1] : file.gitBaseline ? file.before.text : null;
           const merged=base===null||migrate ? {conflict:true} : mergeText(base,current,file.after.text);
           if (merged.conflict) {
             queueIncoming(key,file,signature);
           } else {
-            if (open.getText()!==current || !await replaceBuffer(open,merged.text)) { queueIncoming(key,file,signature); }
+            if (open.getText()!==current || !await replaceBuffer(open,merged.text,'refresh.incoming',file.after.text)) { queueIncoming(key,file,signature); }
             else current=open.getText();
           }
         }
         if (incoming.has(key) && current===file.after.text) incoming.delete(key);
         if ((!review || review.signature !== signature) && !incoming.has(key)) {
           review = review ? (advanceReview(review,file.after.text)||new Review(file.before.text,file.after.text)) : new Review(file.before.text,file.after.text);
+          delete review.savedText; // The new hook snapshot is now the incoming merge baseline.
           review.signature = signature; review.uri = uri;
           if (current !== review.text) reconcile(review,current,isLatest);
           reviews.set(key,review);
@@ -313,13 +344,17 @@ function activate(context) {
       if(!['Load Codex version','Keep editor version'].includes(decision)) return false;
       if(incoming.get(key)!==item) return false;
       if(decision==='Load Codex version') {
-        if(!await replaceBuffer(doc,item.file.after.text)) return false;
+        if(!await replaceBuffer(doc,item.file.after.text,'resolveIncoming.load',item.file.after.text)) {
+          vscode.window.showWarningMessage('The file changed on disk after this capture. The older captured version was not loaded.');
+          return false;
+        }
         const review=new Review(item.file.before.text,item.file.after.text);
         review.signature=item.signature;review.uri=doc.uri.toString();reviews.set(key,review);
       } else {
         let review=reviews.get(key);
         if(!review) {review=new Review(doc.getText(),doc.getText());review.uri=doc.uri.toString();reviews.set(key,review);}
         review.signature=item.signature;
+        delete review.savedText;
       }
       incoming.delete(key);
       await saveReviews();await refresh();return true;
@@ -331,8 +366,9 @@ function activate(context) {
       review.regions=snapshot.regions.map(r=>({...r}));
       review.text=snapshot.reviewText??snapshot.text;
       review.history.clear(); review.remember();
+      const saveVersion=doc.version;
       await saveReviews(); await refresh();
-      return true;
+      return reviewSaver.save(doc, review.savedText ?? JSON.parse(review.signature)[1], 'review.restore', saveVersion);
     }),
     vscode.commands.registerCommand('codexDiff.reviewBlock', async request => {
       if (!request || !['accept','reject'].includes(request.action)) return false;
@@ -341,6 +377,7 @@ function activate(context) {
       const projected=inlineDocuments.some(d=>d.uri===review?.uri&&d.after===request.expected&&d.hunks.some(h=>h.reviewKey===request.reviewKey&&h.block===request.block&&h.reviewVersion===request.reviewVersion));
       // A button belongs to a specific rendered version and chat.
       if (!review || !doc || !sessions.some(s=>request.reviewKey.startsWith(`${s.key}:`)) || incoming.has(request.reviewKey) || doc.getText()!==(request.current??request.expected) || (review.text!==request.expected&&!projected) || request.reviewVersion!==reviewVersion(review)) return false;
+      const expectedDisk = review.savedText ?? JSON.parse(review.signature)[1];
       if (request.action==='accept') {
         const before={reviewKey:request.reviewKey,signature:review.signature,text:doc.getText(),reviewText:review.text,regions:review.regions.map(r=>({...r}))};
         if (!review.accept(request.block)) return false;
@@ -354,6 +391,12 @@ function activate(context) {
         }
       } else {
         const current=doc.getText();
+        const disk=readDisk(doc);
+        if (disk!==expectedDisk && disk!==current) {
+          traceWrite(log,'review.reject','blocked-disk-changed',doc,{expectedDiskHash:fingerprint(expectedDisk)});
+          vscode.window.showWarningMessage('The file changed on disk. Reload or resolve the external edits before rejecting this block.');
+          return false;
+        }
         const planned=planRejection(review,request.block,current);
         if(planned.missing)return false;
         if(planned.conflict){
@@ -377,11 +420,13 @@ function activate(context) {
         review.regions.splice(request.block,1);
         const edit=new vscode.WorkspaceEdit();
         edit.replace(doc.uri,new vscode.Range(doc.positionAt(start),doc.positionAt(end)),next.slice(start,nextEnd));
+        traceWrite(log,'review.reject','buffer-replace',doc,{targetHash:fingerprint(next)});
         if (!await vscode.workspace.applyEdit(edit)) { review.regions=previous; return false; }
         review.recordRejection(beforeReject);
       }
+      const saveVersion=doc.version;
       await saveReviews(); await refresh();
-      return true;
+      return reviewSaver.save(doc, expectedDisk, `review.${request.action}`, saveVersion);
     }),
     vscode.window.registerTreeDataProvider('codexDiff.files', tree),
     vscode.commands.registerCommand('codexDiff.refresh', refresh),
@@ -396,13 +441,25 @@ function activate(context) {
       await vscode.window.showTextDocument(vscode.Uri.file(file.path)); await refresh();
     }),
     vscode.window.onDidChangeVisibleTextEditors(() => refresh()),
+    vscode.workspace.onWillSaveTextDocument(event => {
+      traceWrite(log,'editor.save','will-save',event.document,{reason:event.reason});
+    }),
+    vscode.workspace.onDidSaveTextDocument(doc => {
+      traceWrite(log,'editor.save','did-save',doc);
+    }),
     vscode.workspace.onDidChangeTextDocument(event => {
+      let reviewUndoRedo = false;
+      let expectedDisk;
       for (const review of reviews.values()) if (review.uri===event.document.uri.toString()) {
         let expected=review.text;
         for(const change of [...event.contentChanges].sort((a,b)=>b.rangeOffset-a.rangeOffset))expected=expected.slice(0,change.rangeOffset)+change.text+expected.slice(change.rangeOffset+change.rangeLength);
         if(expected!==event.document.getText())continue;
-        review.update(event.contentChanges,event.document.getText(),!!event.reason);
+        if (review.update(event.contentChanges,event.document.getText(),!!event.reason)) {
+          reviewUndoRedo = true;
+          expectedDisk = review.savedText ?? JSON.parse(review.signature)[1];
+        }
       }
+      if (reviewUndoRedo) reviewSaver.afterUndoRedo(event.document, expectedDisk);
       clearTimeout(saveTimer); saveTimer=setTimeout(saveReviews,200);
       refresh();
     })

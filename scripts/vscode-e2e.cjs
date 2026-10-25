@@ -103,24 +103,40 @@ exports.run = async function () {
       return vscode.commands.executeCommand('codexDiff.reviewBlock',{action,reviewKey:change.reviewKey,reviewVersion:change.reviewVersion,block:change.hunks[0].block,expected});
     }
     const reviewedText=doc.getText();
+    let saveParticipants = 0;
+    const participant = vscode.workspace.onWillSaveTextDocument(event => {
+      if (event.document !== doc) return;
+      saveParticipants++;
+      event.waitUntil(Promise.resolve([vscode.TextEdit.insert(new vscode.Position(0,0),'// unexpected save formatting\n')]));
+    });
+    async function expectSaved(document = doc) {
+      await waitFor(() => !document.isDirty && fs.readFileSync(document.uri.fsPath,'utf8') === document.getText());
+    }
     assert.equal(await act('reject','outdated contents'),false);
     assert.equal(doc.getText(),reviewedText);
     assert.equal(await act('reject'),true);
+    await expectSaved();
     await expectBlocks(0);
     assert.ok(doc.getText().includes('// my own code'));
     assert.ok(doc.getText().includes('const old = "hello";'));
     await vscode.commands.executeCommand('undo');
     await expectBlocks(1);
     assert.equal(doc.getText(),reviewedText);
+    await expectSaved();
     assert.equal(await act('accept'),true);
+    await expectSaved();
     await expectBlocks(0);
     assert.equal(doc.getText(),reviewedText);
     await vscode.commands.executeCommand('undo');
     await expectBlocks(1);
     assert.equal(doc.getText(),reviewedText);
+    await expectSaved();
     await vscode.commands.executeCommand('redo');
     await expectBlocks(0);
     assert.equal(doc.getText(),reviewedText);
+    await expectSaved();
+    assert.equal(saveParticipants,0,'Review saves must skip formatting/save participants to preserve undo order');
+    participant.dispose();
     // Later typing must undo first, followed by the acceptance itself.
     const later=new vscode.WorkspaceEdit();
     later.insert(doc.uri,doc.positionAt(doc.getText().length),'\n// after accepting');
@@ -131,9 +147,12 @@ exports.run = async function () {
     await vscode.commands.executeCommand('undo');
     await expectBlocks(1);
     assert.equal(doc.getText(),reviewedText);
-    assert.equal(fs.readFileSync(file,'utf8'),after);
+    assert.equal(fs.readFileSync(file,'utf8'),reviewedText);
     assert.equal(await act('reject'),true);
     const rejectedText=doc.getText();
+    const afterReviewTyping=new vscode.WorkspaceEdit();
+    afterReviewTyping.insert(doc.uri,new vscode.Position(0,0),'// unsaved after reviewing\n');
+    await vscode.workspace.applyEdit(afterReviewTyping);
     async function captureNext(text,id) {
       event.tool_use_id=id;
       hook('PreToolUse');fs.writeFileSync(file,text);hook('PostToolUse');
@@ -146,13 +165,19 @@ exports.run = async function () {
       }
       assert.fail('Timed out waiting for incoming capture synchronization');
     }
-    const appended=after+'console.log("new capture");\n';
+    // Codex now reads the saved rejection as its starting point. Keep a new
+    // unsaved edit in the buffer to exercise the incoming merge separately.
+    const appended=rejectedText+'console.log("new capture");\n';
     await captureNext(appended,'capture-two');
     await waitFor(info=>!info.incoming.length&&doc.getText().includes('new capture'));
     assert.ok(doc.getText().includes('const old = "hello";'),'Rejected code must remain');
     assert.ok(doc.getText().includes('// my own code'),'Independent typing must remain');
+    const localConflict=new vscode.WorkspaceEdit();
+    const helloOffset=doc.getText().indexOf('hello');
+    localConflict.replace(doc.uri,new vscode.Range(doc.positionAt(helloOffset),doc.positionAt(helloOffset+5)),'local edit');
+    await vscode.workspace.applyEdit(localConflict);
     const preserved=doc.getText();
-    const conflict=appended.replace('welcome','conflicting edit');
+    const conflict=appended.replace('hello','conflicting edit');
     await captureNext(conflict,'capture-three');
     const pendingInfo=await waitFor(info=>info.incoming.length===1);
     assert.equal(doc.getText(),preserved,'Conflict must not overwrite editor');
@@ -174,12 +199,15 @@ exports.run = async function () {
       action:'reject',reviewKey:loaded.reviewKey,reviewVersion:loaded.reviewVersion,
       block:loaded.hunks[0].block,expected:doc.getText()
     }),true);
+    await expectSaved();
     await waitFor(info=>info.changes.find(d=>d.uri===doc.uri.toString())?.hunks.length===loadedCount-1);
     await vscode.commands.executeCommand('undo');
     await waitFor(info=>info.changes.find(d=>d.uri===doc.uri.toString())?.hunks.length===loadedCount);
     assert.equal(doc.getText(),conflictAgain);
+    await expectSaved();
     await vscode.commands.executeCommand('redo');
     await waitFor(info=>info.changes.find(d=>d.uri===doc.uri.toString())?.hunks.length===loadedCount-1);
+    await expectSaved();
     await vscode.commands.executeCommand('undo');
     await waitFor(info=>info.changes.find(d=>d.uri===doc.uri.toString())?.hunks.length===loadedCount);
     await vscode.commands.executeCommand('undo');
@@ -198,9 +226,11 @@ exports.run = async function () {
     assert.equal(await vscode.commands.executeCommand('codexDiff.sidebarAction',{type:'block',action:'reject',...secondRow,expected:secondRow.after,block:secondRow.hunks[0].block}),true);
     const secondDoc=await vscode.workspace.openTextDocument(second);
     assert.equal(secondDoc.getText(),'const value = 1;\n');
+    await expectSaved(secondDoc);
     await vscode.window.showTextDocument(secondDoc);
     await vscode.commands.executeCommand('undo');
     await waitFor(info=>info.changes.find(d=>d.uri===secondDoc.uri.toString())?.hunks.length===1);
+    await expectSaved(secondDoc);
     const flagged=path.join(project,'flagged.js');
     fs.writeFileSync(flagged,'// deleted fixture\n');
     event.tool_use_id='sidebar-flagged';
@@ -212,6 +242,7 @@ exports.run = async function () {
     const bulk={type:'all',action:'accept',selection:panel.selection,files:panel.files.filter(f=>f.hunks.length&&!f.warning).map(f=>({reviewKey:f.reviewKey,reviewVersion:f.reviewVersion,expected:f.after}))};
     assert.ok(bulk.files.length>=2);
     assert.equal(await vscode.commands.executeCommand('codexDiff.sidebarAction',bulk),true);
+    for(const request of bulk.files) await expectSaved(await vscode.workspace.openTextDocument(vscode.Uri.parse(panel.files.find(f=>f.reviewKey===request.reviewKey).uri)));
     await waitFor(info=>info.changes.every(d=>!d.hunks.length));
     await assert.rejects(vscode.commands.executeCommand('codexDiff.sidebarAction',bulk),/refreshed sidebar/);
     for(const request of bulk.files){
@@ -260,18 +291,22 @@ exports.run = async function () {
     const h=combined.hunks[0];
     assert.equal(await vscode.commands.executeCommand('codexDiff.reviewBlock',{action:'reject',reviewKey:h.reviewKey,reviewVersion:h.reviewVersion,expected:combined.after,block:h.block}),true);
     assert.equal(sharedDoc.getText(),'const a = 1;\n// anchor\nconst b = 2;\n');
+    await expectSaved(sharedDoc);
     await vscode.commands.executeCommand('undo');
     await waitFor(info=>info.editorDocuments.find(d=>d.uri===sharedDoc.uri.toString())?.hunks.length===2);
+    await expectSaved(sharedDoc);
     for(const action of ['accept','reject']){
       const info=await waitFor(info=>info.editorDocuments.find(d=>d.uri===sharedDoc.uri.toString())?.hunks.length===2);
       const fileReview=info.editorDocuments.find(d=>d.uri===sharedDoc.uri.toString());
       const request={action,uri:fileReview.uri,expected:fileReview.after,stamp:JSON.stringify(info.changes.find(d=>d.uri===sharedDoc.uri.toString()).hunks.map(h=>[info.changes.find(d=>d.uri===sharedDoc.uri.toString()).reviewKey,info.changes.find(d=>d.uri===sharedDoc.uri.toString()).reviewVersion,h.block]))};
       assert.equal(await vscode.commands.executeCommand('codexDiff.reviewFile',request),true);
+      await expectSaved(sharedDoc);
       await waitFor(info=>!info.changedFiles.includes(sharedDoc.uri.toString()));
       assert.equal(sharedDoc.getText(),action==='accept'?'const a = 2;\n// anchor\nconst b = 2;\n':'const a = 2;\n// anchor\nconst b = 1;\n');
       assert.equal(await vscode.commands.executeCommand('codexDiff.reviewFile',request),false);
       await vscode.commands.executeCommand('undo');
       await waitFor(info=>info.editorDocuments.find(d=>d.uri===sharedDoc.uri.toString())?.hunks.length===2);
+      await expectSaved(sharedDoc);
     }
     await vscode.commands.executeCommand('codexDiff.followChat',{id:'new-chat-without-captures'});
     await waitFor(info=>info.selected===undefined&&info.changedFiles.length===0);
@@ -307,6 +342,58 @@ exports.run = async function () {
     await vscode.commands.executeCommand('undo');
     await waitFor(info=>info.changes.some(f=>f.reviewKey===oldFile.reviewKey&&f.hunks.length===1));
     assert.equal(overlapDoc.getText(),'newer important work\n');
+    // Commits settle all historical captures for clean files, without deleting
+    // their hook history. Later tools in the same chat start at that checkpoint.
+    function git(...args) {
+      const child=spawnSync('git',['-C',project,'-c','user.name=Diffdex Test','-c','user.email=test@example.invalid','-c','commit.gpgsign=false',...args],{encoding:'utf8'});
+      assert.equal(child.status,0,child.stderr);
+    }
+    for(const document of vscode.workspace.textDocuments) {
+      if(document.uri.scheme==='file'&&document.uri.fsPath.startsWith(project+path.sep)&&document.isDirty&&fs.existsSync(document.uri.fsPath))assert.equal(await document.save(),true);
+    }
+    git('init','--quiet');git('add','--all');git('commit','--quiet','-m','Commit captured changes');
+    await waitFor(info=>info.editorDocuments.length===0&&info.changedFiles.length===0&&info.incoming.length===0);
+    assert.equal((await vscode.commands.executeCommand('codexDiff.sidebarState')).files.length,0);
+    captureOverlap(oldChat,'after commit proposal\n');
+    const postCommit=await waitFor(info=>info.changes.some(file=>file.hunks.length));
+    const next=postCommit.changes.find(file=>file.uri===overlapDoc.uri.toString());
+    assert.deepEqual(next.hunks[0].removed,['newer important work']);
+    assert.deepEqual(next.hunks[0].added,['after commit proposal']);
+    await overlapDoc.save();git('add','--all');
+    await waitFor(info=>info.changedFiles.includes(overlapDoc.uri.toString()));
+    git('commit','--quiet','-m','Commit next turn');
+    await waitFor(info=>info.editorDocuments.length===0&&info.changedFiles.length===0);
+    // Regression: an automatically saved rejection is Git-clean too. It must
+    // not be checkpointed as a commit, or its normal text Undo loses the review.
+    captureOverlap(oldChat,'undoable proposal\n');
+    await waitFor(info=>info.changes.some(file=>file.uri===overlapDoc.uri.toString()&&file.hunks.length===1));
+    await vscode.window.showTextDocument(overlapDoc);
+    for(let cycle=0;cycle<2;cycle++) {
+      const ready=await waitFor(info=>info.changes.some(file=>file.uri===overlapDoc.uri.toString()&&file.hunks.length===1));
+      const row=ready.changes.find(file=>file.uri===overlapDoc.uri.toString());
+      assert.equal(await vscode.commands.executeCommand('codexDiff.reviewBlock',{
+        action:'reject',reviewKey:row.reviewKey,reviewVersion:row.reviewVersion,expected:overlapDoc.getText(),block:row.hunks[0].block
+      }),true);
+      await expectSaved(overlapDoc);
+      assert.equal(overlapDoc.getText(),'after commit proposal\n');
+      for(let i=0;i<3;i++)await waitFor(info=>!info.changedFiles.includes(overlapDoc.uri.toString()));
+      await vscode.commands.executeCommand('undo');
+      const restoredReview=await waitFor(info=>info.changedFiles.includes(overlapDoc.uri.toString()));
+      const restoredFile=restoredReview.changes.find(file=>file.uri===overlapDoc.uri.toString());
+      assert.deepEqual(restoredFile.hunks[0].removed,['after commit proposal']);
+      assert.deepEqual(restoredFile.hunks[0].added,['undoable proposal']);
+      await expectSaved(overlapDoc);
+      assert.equal(overlapDoc.getText(),'undoable proposal\n');
+      await vscode.commands.executeCommand('redo');
+      await waitFor(info=>!info.changedFiles.includes(overlapDoc.uri.toString()));
+      await expectSaved(overlapDoc);
+      assert.equal(overlapDoc.getText(),'after commit proposal\n');
+      await vscode.commands.executeCommand('undo');
+      await waitFor(info=>info.changedFiles.includes(overlapDoc.uri.toString()));
+      await expectSaved(overlapDoc);
+    }
+    git('add','--all');git('commit','--quiet','-m','Commit after review undo');
+    await waitFor(info=>info.editorDocuments.length===0&&info.changedFiles.length===0);
     fs.writeFileSync(report,JSON.stringify({ok:true,checks:['hook subprocess capture','session store','extension bridge','real file editor view zone','source unchanged','manual edit preservation','accept and reject blocks','reject undo','reject undo and redo after incoming load and save','accept undo and redo','acceptance and typing undo order','stale action guard','built-in themes and JS grammar registered','source and deleted code tokenized','light theme selection','incoming edits merge into dirty buffers','conflicts preserve rejected code','explicit incoming resolution and undo'],result},null,2));
   }catch(error){fs.writeFileSync(report,JSON.stringify({ok:false,error:String(error),stack:error.stack},null,2));throw error;}
 };

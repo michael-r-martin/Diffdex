@@ -2,6 +2,7 @@
 const fs=require('node:fs');
 const path=require('node:path');
 const crypto=require('node:crypto');
+const { patchFileContext }=require('./codex-file-context.cjs');
 const root=path.resolve(__dirname,'..');
 const base=path.join(root,'.prototype-runtime/extensions/openai.chatgpt-26.1007.21434-darwin-arm64');
 const oldHost='case"codex-diff-active-chat":{void je.commands.executeCommand("codexDiff.followChat",{id:r.id}).then(()=>{},()=>{});break}';
@@ -27,7 +28,8 @@ const planned=edits.map(([relative,needle,replacement])=>{
     clean=clean.replace(clientReplacement,clientNeedle);
   }else clean=clean.replace(oldHost,'').replace(hostReplacement,hostNeedle);
   if(clean.split(needle).length!==2)throw Error(`Unsupported Codex build: ${relative}`);
-  const result=clean.replace(needle,replacement)+(relative.startsWith('webview/')?addition:'');
+  let result=clean.replace(needle,replacement)+(relative.startsWith('webview/')?addition:'');
+  if(relative==='out/extension.js')result=patchFileContext(result);
   return result===source?null:{file,source,result};
 });
 for(const entry of planned.filter(Boolean)){

@@ -8,7 +8,7 @@ function patchWorkbench(source) {
   if (sha(source) !== expected) throw new Error('Unexpected installed version; refusing to patch.');
   const needle = 'this._codeEditorService.addCodeEditor(this)}static{this.dropIntoEditorDecorationOptions=';
   if (source.split(needle).length !== 2) throw new Error('Editor hook is not unique.');
-  for (const marker of ['qe.registerCommand("_executeCodeActionProvider"', 'async function HU(s,o,e)', 'm(1,Gt)],$re)', 'var be=ue("commandService")', 'var Nl=ue("undoRedoService")']) {
+  for (const marker of ['qe.registerCommand("_executeCodeActionProvider"', 'async function HU(s,o,e)', 'm(1,Gt)],$re)', 'var be=ue("commandService")', 'var Nl=ue("undoRedoService")', 'var wn=ue("textFileService")']) {
     if (!source.includes(marker)) throw new Error(`Unknown workbench bridge: ${marker}`);
   }
   const injection = ['runtime-overlay.js', 'review-undo.js'].map(file => fs.readFileSync(path.join(__dirname, file), 'utf8')).join('\n');

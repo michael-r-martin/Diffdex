@@ -18,6 +18,7 @@ if (!source.includes('qe.registerCommand("_executeCodeActionProvider"')) throw n
 if (!source.includes('async function HU(s,o,e)') || !source.includes('m(1,Gt)],$re)')) throw new Error('Unknown tokenizer bridge');
 if (!source.includes('var be=ue("commandService")')) throw new Error('Unknown command service');
 if (!source.includes('var Nl=ue("undoRedoService")')) throw new Error('Unknown undo service');
+if (!source.includes('var wn=ue("textFileService")')) throw new Error('Unknown text file service');
 const injection = fs.readFileSync(path.join(__dirname, 'runtime-overlay.js'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, 'review-undo.js'), 'utf8');
 const uiFontNeedle = 'gt?"-apple-system, BlinkMacSystemFont, sans-serif"';
 if (source.split(uiFontNeedle).length !== 2) throw new Error('Unknown UI font default');

@@ -24,7 +24,7 @@ Review/trust the hooks through Codex's `/hooks` CLI flow. This project's two cap
 
 Open the same checkout in the patched editor and make an edit through Codex. The **Codex Chat Changes** Explorer section lists captured files. Click the **Codex** status-bar item or run **Codex Diffs: Select Chat** to choose a session. Diffs appear automatically in matching files; no toggle or cursor placement is needed. Chat IDs are shown because hook payloads do not include chat titles.
 
-Each block has **Accept** and **Reject** buttons. Accept clears its review overlay without editing the file. Normal Undo restores the accepted block and Redo accepts it again; later typing remains a separate undo step. Reject restores its original lines in the editor and preserves independent code outside the block; normal Undo reverses it. Reject leaves the document unsaved. Review decisions persist locally for the current captured snapshot; a later Codex capture of that file starts a new review.
+Each block has **Accept** and **Reject** buttons. Accept clears its review overlay without editing the file. Normal Undo restores the accepted block and Redo accepts it again; later typing remains a separate undo step. Reject restores its original lines in the editor and preserves independent code outside the block; normal Undo reverses it. Accept, reject, and undo/redo of those decisions automatically save the affected file, including its other current edits. Review saves skip save participants so formatting does not interrupt undo history. Failed saves are reported. Review decisions persist locally for the current captured snapshot; later captures build on the effective review baseline.
 
 When Codex edits a file with unsaved editor changes, non-overlapping changes merge into the buffer automatically as an undoable edit. Conflicting changes stay pending: a notification and the status bar offer **Load Codex version** or **Keep editor version**. Loading is undoable; neither choice automatically saves your file. You can reopen this choice with **Codex Diffs: Resolve Incoming Changes**.
 
@@ -64,7 +64,7 @@ Inline editors show pending blocks from all captured chats in the open checkout.
 
 Separate changes in the same file can appear together. Older snapshots that overlap newer edits are flagged in their chat's sidebar instead of being rendered over unrelated code. Whole-file deletions and unresolved conflicts are excluded from the inline navigator.
 
-The top navigator also provides **Accept File** and **Reject File** for the selected chat's pending blocks in that file. These controls are disabled when that chat has no changes in the file. Rejection leaves the buffer unsaved; undo restores decisions block by block.
+The top navigator also provides **Accept File** and **Reject File** for the selected chat's pending blocks in that file. These controls are disabled when that chat has no changes in the file. Decisions save automatically; undo restores and saves decisions block by block.
 
 When other chats in this checkout have reviewable changes, the top strip shows an **Other chats** dropdown with chat titles and pending file counts. Selecting a chat switches the review selection and opens its first pending file. When the current chat is caught up, **Changes in N other chats** replaces the disabled navigation controls. Conflicted or unavailable files do not count as jump targets; chats with both ready files and unresolved files also show a warning count. Chat selection remains a manual override until the Codex view reports another selection/focus event.
 
@@ -74,5 +74,7 @@ Click the **Codex Diffs** icon (a page with plus/minus signs) in the Activity Ba
 
 - **Accept / Reject** applies to one block; **Open file** takes you to its source.
 - **Accept all / Reject all** processes the pending blocks for the selected chat. Decisions share state with the inline editor controls.
-- Rejections edit buffers without saving them. Undo/redo remains per file; a bulk operation creates individual decisions in each file's undo history.
+- Accept, reject, and undo/redo of those decisions save the affected files automatically. Undo/redo remains per file; a bulk operation creates individual decisions in each file's undo history.
 - Stale clicks are refused. Bulk actions process reviewable blocks and explicitly skip files flagged with incoming conflicts, unavailable contents, oversized diffs, or whole-file deletions. Whole-file deletion restoration is not implemented yet.
+
+Explorer's **Add to Codex Chat** action attaches clicked or selected files to the active embedded chat's composer. It delegates to the native Codex attachment command, with a pinned adapter that preserves the last focused chat when it is in an editor panel. The adapter is prepared together with the selection bridge by `npm run setup:codex`.

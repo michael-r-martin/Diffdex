@@ -6,6 +6,7 @@ const crypto = require('node:crypto');
 const { execFileSync } = require('node:child_process');
 const { patchWorkbench, expected, sha } = require('../prototype/workbench-patch.cjs');
 const { resolveEditor } = require('./editor-source.cjs');
+const { marker: fileContextMarker } = require('../scripts/codex-file-context.cjs');
 const root = path.resolve(__dirname, '..');
 const run = (command, args) => execFileSync(command, args, { stdio: 'inherit' });
 const json = file => JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -82,6 +83,7 @@ function build(output = path.join(root, 'dist', `build-${Date.now()}`)) {
     if (!fs.existsSync(path.join(from, 'package.json'))) throw Error('Auto-follow dependencies missing. Run npm run setup:codex with your exact supported extension folders.');
     if (json(path.join(from, 'package.json')).version !== '26.1007.21434') throw Error(`Unsupported Codex extension: ${directory}`);
     if (directory.startsWith('openai.chatgpt-') && !fs.readFileSync(path.join(from, 'out/extension.js'), 'utf8').includes('codex-diff-active-chat')) throw Error('Run npm run setup:codex to prepare the private selection bridge.');
+    if (directory.startsWith('openai.chatgpt-') && !fs.readFileSync(path.join(from, 'out/extension.js'), 'utf8').includes(fileContextMarker)) throw Error('Run npm run setup:codex to prepare the file context adapter.');
   }
   fs.mkdirSync(output, { recursive: true });
   const app = path.join(output, 'Diffdex.app');

@@ -31,7 +31,7 @@ class Review {
           : next===record.after.text&&this.text===record.before.text ? record.after : null;
         if (target) {
           this.regions=target.regions.map(r=>({...r}));
-          this.text=next;this.remember();return;
+          this.text=next;this.remember();return true; // A rejection was undone/redone; save this decision.
         }
       }
     }

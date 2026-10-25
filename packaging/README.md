@@ -38,7 +38,7 @@ The app has its own bundle ID (`com.unseriouslabs.diffdex`), `diffdex:` URL sche
 
 ## Install and use
 
-Copy `Diffdex.app` to `/Applications`, then launch it from Finder or the Dock. Open any project with **File → Open Folder**. Diffdex automatically installs capture hooks for trusted local project folders and shows the next steps. Review and trust the generated hooks in Codex. Use **Diffdex: Enable Change Capture for Project** in the command palette to retry setup. An existing chat may need to reload its hook configuration or be replaced with a new chat. Existing unrelated hooks are preserved and changed hook files are backed up.
+Copy `Diffdex.app` to `/Applications`, then launch it from Finder or the Dock. Open any project with **File → Open Folder**. Diffdex automatically installs capture hooks for trusted local project folders and shows the next steps. Review and trust the generated hooks in Codex. Use **Diffdex: Enable Change Capture for Project** in the command palette to retry setup. An existing chat may need to reload its hook configuration or be replaced with a new chat. If capture still does not start, fully quit and reopen Diffdex and the ChatGPT Mac app (if you are using it), then try a new edit. Restarting both apps was needed in a confirmed setup. Existing unrelated hooks are preserved and changed hook files are backed up.
 
 The built-in review extension and Codex extension ship as application resources. No development-extension flag, source checkout, system Node installation or demo launcher is required. The capture hook uses the app's own Electron runtime as Node.
 

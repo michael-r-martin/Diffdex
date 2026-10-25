@@ -19,10 +19,14 @@
     "build:mac": "node packaging/build-macos.cjs",
     "verify:mac": "node packaging/verify-macos.cjs",
     "test": "node --test test/*.test.js",
-    "check": "node --check src/extension.js && node --check src/setup.js && node --check src/diff.js && node --check prototype/runtime-overlay.js && node --check prototype/patch-copy.cjs && sh -n prototype/launch-copy.sh && node --check hooks/capture.cjs && node --check scripts/install-hooks.cjs && node --check src/store.js && node --check src/review.js && node --check prototype/review-undo.js && node --check src/merge.js && node --check packaging/editor-source.cjs && node --check packaging/setup-codex.cjs && node --check packaging/build-macos.cjs && node --check packaging/verify-macos.cjs && node --check packaging/package-macos.cjs"
+    "check": "node --check src/extension.js && node --check src/setup.js && node --check src/chat-context.js && node --check src/review-save.js && node --check src/write-diagnostics.js && node --check src/git-review.js && node --check scripts/codex-file-context.cjs && node --check scripts/install-codex-selection-bridge.cjs && node --check scripts/vscode-e2e.cjs && node --check src/diff.js && node --check prototype/runtime-overlay.js && node --check prototype/patch-copy.cjs && sh -n prototype/launch-copy.sh && node --check hooks/capture.cjs && node --check scripts/install-hooks.cjs && node --check src/store.js && node --check src/review.js && node --check prototype/review-undo.js && node --check src/merge.js && node --check packaging/editor-source.cjs && node --check packaging/setup-codex.cjs && node --check packaging/build-macos.cjs && node --check packaging/verify-macos.cjs && node --check packaging/package-macos.cjs"
   },
   "contributes": {
     "commands": [
+      {
+        "command": "codexDiff.addFileToChat",
+        "title": "Add to Codex Chat"
+      },
       {
         "command": "codexDiff.enableCapture",
         "title": "Diffdex: Enable Change Capture for Project"
@@ -44,6 +48,21 @@
         "title": "Codex Diffs: Resolve Incoming Changes"
       }
     ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "codexDiff.addFileToChat",
+          "when": "resourceScheme == file && !explorerResourceIsFolder",
+          "group": "codex@1"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "codexDiff.addFileToChat",
+          "when": "false"
+        }
+      ]
+    },
     "viewsContainers": {
       "activitybar": [
         {
@@ -74,7 +93,7 @@
         "codexDiff.storePath": {
           "type": "string",
           "default": "",
-          "description": "Local snapshot directory shared with the Codex capture hooks. Empty uses this prototype\u2019s runtime directory."
+          "description": "Local snapshot directory shared with the Codex capture hooks. Empty uses this prototype’s runtime directory."
         }
       }
     }
